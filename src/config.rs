@@ -36,11 +36,68 @@ impl Environment {
     }
 }
 
+fn next<'a>(
+    resources: &'a HashMap<String, Resource>,
+    deps: &HashMap<&'a String, HashSet<String>>,
+) -> HashMap<&'a String, HashSet<String>> {
+    let mut next_deps = deps.clone();
+    for (k, v) in resources {
+        for dep in v.get_dependances() {
+            match next_deps.get_mut(k) {
+                Some(set) => {
+                    set.insert(dep);
+                }
+                None => panic!("Resource {} not found", k),
+            }
+        }
+    }
+    next_deps
+}
+
 fn order_dependences<'a>(
     resources: &'a HashMap<String, Resource>,
 ) -> Vec<(&'a String, &'a Resource)> {
-    let mut deps: HashMap<&'a String, HashSet<&'a String>> = HashMap::new();
-    todo!()
+    let keys = resources.keys().collect::<Vec<_>>();
+    let mut deps: HashMap<&'a String, HashSet<String>> =
+        HashMap::from_iter(keys.iter().map(|k| (*k, HashSet::new())));
+    let mut deps_next = next(resources, &deps);
+    while deps_next != deps {
+        deps = deps_next;
+        deps_next = next(resources, &deps);
+    }
+    let ancestors = keys
+        .iter()
+        .map(|k| {
+            (
+                *k,
+                deps.iter()
+                    .filter(|(_, v)| v.contains(*k))
+                    .map(|(k, _)| *k)
+                    .collect::<HashSet<_>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let mut result = Vec::new();
+    while keys
+        .iter()
+        .any(|k| result.iter().all(|(name, _)| name != k))
+    {
+        // TODO : relire le code de la boucle
+        for k in keys.iter() {
+            if !result.iter().any(|(name, _)| name == k) {
+                if ancestors[k]
+                    .iter()
+                    .all(|a| result.iter().any(|(name, _)| name == a))
+                {
+                    result.push((*k, resources.get(*k).unwrap()));
+                }
+            }
+        }
+    }
+    // if deps.iter().any(|(name, v)| v.contains(*name)) {
+    //     panic!("Circular dependences detected");
+    // }
+    return result;
 }
 
 #[derive(Serialize, Deserialize, Debug)]

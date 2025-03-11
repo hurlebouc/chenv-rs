@@ -19,11 +19,9 @@ fn main() {
     let conf = config::read_config(&args.conf_path);
     let mut cmd = Command::new(get_shell());
     if let Some(shell) = &conf.shell {
-        if let Some(e) = &shell.env {
-            for (k, v) in e {
-                cmd.env(k, v);
-            }
+        for (k, v) in shell.get_env(&shell.ensure_resources()) {
+            cmd.env(k, v);
         }
     }
-    cmd.status().expect("ls command failed to start");
+    cmd.status().expect("shell failed to start");
 }

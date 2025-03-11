@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-pub struct Env(pub HashMap<String, String>);
+use crate::resources::Substrate;
+
+pub struct Env(pub HashMap<String, Substrate>);
 
 impl Env {
     pub fn interpolate(&self, s: &str) -> String {
@@ -18,7 +20,7 @@ impl Env {
                     }
                     let key = &s[start + 1..end];
                     match self.0.get(key) {
-                        Some(val) => result.push_str(val),
+                        Some(val) => result.push_str(&val.to_string()),
                         None => result.push_str(&format!("${{{}}}", key)),
                     }
                 }
@@ -37,8 +39,8 @@ mod tests {
     #[test]
     fn test_interpolate() {
         let env = Env(vec![
-            ("FOO".to_string(), "bar".to_string()),
-            ("BAZ".to_string(), "qux".to_string()),
+            ("FOO".to_string(), Substrate::new("bar".to_string())),
+            ("BAZ".to_string(), Substrate::new("qux".to_string())),
         ]
         .into_iter()
         .collect());

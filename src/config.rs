@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use config::Config;
 use serde::{Deserialize, Serialize};
@@ -25,7 +28,7 @@ impl Environment {
     pub fn ensure_resources(&self) -> Env {
         let mut resources = HashMap::new();
         if let Some(r) = &self.resources {
-            for (k, v) in order(r) {
+            for (k, v) in order_dependences(r) {
                 resources.insert(k.clone(), v.ensure_resources(&resources));
             }
         }
@@ -33,7 +36,10 @@ impl Environment {
     }
 }
 
-fn order<'a>(r: &'a HashMap<String, Resource>) -> Vec<(&'a String, &'a Resource)> {
+fn order_dependences<'a>(
+    resources: &'a HashMap<String, Resource>,
+) -> Vec<(&'a String, &'a Resource)> {
+    let mut deps: HashMap<&'a String, HashSet<&'a String>> = HashMap::new();
     todo!()
 }
 

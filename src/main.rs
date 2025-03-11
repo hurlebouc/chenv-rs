@@ -16,7 +16,7 @@ fn get_shell() -> String {
 
 fn main() {
     let args = cli::get_cli();
-    let conf = config::read_config();
+    let conf = config::read_config(&args.conf_path);
     let mut cmd = Command::new(get_shell());
     if let Some(shell) = &conf.shell {
         if let Some(e) = &shell.env {

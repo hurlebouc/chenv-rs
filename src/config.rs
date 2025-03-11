@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use config::Config;
 use serde::{Deserialize, Serialize};
@@ -30,11 +33,12 @@ pub struct Conf {
     pub builder: Option<BuildEnvironment>,
 }
 
-pub fn read_config() -> Conf {
-    let settings = Config::builder()
-        .add_source(config::File::with_name("chenv"))
-        .build()
-        .unwrap();
+pub fn read_config(path: &Option<PathBuf>) -> Conf {
+    let file = match path {
+        Some(p) => config::File::from(p.as_path()),
+        None => config::File::with_name("chenv"),
+    };
+    let settings = Config::builder().add_source(file).build().unwrap();
 
     let conf = settings.try_deserialize::<Conf>().unwrap();
 

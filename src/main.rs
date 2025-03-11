@@ -1,6 +1,8 @@
 use std::process::Command;
 mod cli;
 mod config;
+mod interpol;
+mod resources;
 
 fn get_shell() -> String {
     let os = std::env::consts::OS;
@@ -16,8 +18,12 @@ fn main() {
     let args = cli::get_cli();
     let conf = config::read_config();
     let mut cmd = Command::new(get_shell());
-    for (k, v) in &conf.env {
-        cmd.env(k, v);
+    if let Some(shell) = &conf.shell {
+        if let Some(e) = &shell.env {
+            for (k, v) in e {
+                cmd.env(k, v);
+            }
+        }
     }
     cmd.status().expect("ls command failed to start");
 }

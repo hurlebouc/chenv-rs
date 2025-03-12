@@ -82,21 +82,22 @@ fn order_dependences<'a>(
         .iter()
         .any(|k| result.iter().all(|(name, _)| name != k))
     {
-        // TODO : relire le code de la boucle
-        for k in keys.iter() {
-            if !result.iter().any(|(name, _)| name == k) {
+        let mut has_new_element = false;
+        for (k, res) in resources.iter() {
+            if result.iter().all(|(name, _)| *name != k) {
                 if ancestors[k]
                     .iter()
                     .all(|a| result.iter().any(|(name, _)| name == a))
                 {
-                    result.push((*k, resources.get(*k).unwrap()));
+                    has_new_element = true;
+                    result.push((k, res));
                 }
             }
         }
+        if !has_new_element {
+            panic!("Circular dependences detected");
+        }
     }
-    // if deps.iter().any(|(name, v)| v.contains(*name)) {
-    //     panic!("Circular dependences detected");
-    // }
     return result;
 }
 

@@ -36,36 +36,39 @@ impl Environment {
     }
 }
 
-fn next<'a>(
-    resources: &'a HashMap<String, Resource>,
-    deps: &HashMap<&'a String, HashSet<String>>,
-) -> HashMap<&'a String, HashSet<String>> {
-    let mut next_deps = deps.clone();
-    for (k, v) in resources {
-        for dep in v.get_dependances() {
-            match next_deps.get_mut(k) {
-                Some(set) => {
-                    set.insert(dep);
-                }
-                None => panic!("Resource {} not found", k),
-            }
-        }
-    }
-    next_deps
+fn next_gen<'a>(
+    deps: &HashMap<&'a String, HashSet<&'a String>>,
+    descendant: impl Fn(&'a String) -> Vec<&'a String>,
+) -> HashMap<&'a String, HashSet<&'a String>> {
+    deps.iter()
+        .map(|(k, v)| {
+            (
+                *k,
+                v.iter()
+                    .map(|dep| {
+                        let mut desc = descendant(dep);
+                        desc.push(dep);
+                        desc
+                    })
+                    .flatten()
+                    .collect::<HashSet<_>>(),
+            )
+        })
+        .collect()
 }
 
-fn order_dependences<'a>(
-    resources: &'a HashMap<String, Resource>,
-) -> Vec<(&'a String, &'a Resource)> {
-    let keys = resources.keys().collect::<Vec<_>>();
-    let mut deps: HashMap<&'a String, HashSet<String>> =
-        HashMap::from_iter(keys.iter().map(|k| (*k, HashSet::new())));
-    let mut deps_next = next(resources, &deps);
+fn order_dependencies_gen<'a>(
+    values: Vec<&'a String>,
+    descendant: impl Fn(&'a String) -> Vec<&'a String>,
+) -> Vec<&'a String> {
+    let mut deps: HashMap<&'a String, HashSet<&'a String>> =
+        HashMap::from_iter(values.iter().map(|k| (*k, HashSet::new())));
+    let mut deps_next = next_gen(&deps, &descendant);
     while deps_next != deps {
         deps = deps_next;
-        deps_next = next(resources, &deps);
+        deps_next = next_gen(&deps, &descendant);
     }
-    let ancestors = keys
+    let ancestors = values
         .iter()
         .map(|k| {
             (
@@ -78,19 +81,16 @@ fn order_dependences<'a>(
         })
         .collect::<HashMap<_, _>>();
     let mut result = Vec::new();
-    while keys
-        .iter()
-        .any(|k| result.iter().all(|(name, _)| name != k))
-    {
+    while values.iter().any(|k| result.iter().all(|name| name != k)) {
         let mut has_new_element = false;
-        for (k, res) in resources.iter() {
-            if result.iter().all(|(name, _)| *name != k) {
+        for k in values.iter() {
+            if result.iter().all(|(name)| name != k) {
                 if ancestors[k]
                     .iter()
-                    .all(|a| result.iter().any(|(name, _)| name == a))
+                    .all(|a| result.iter().any(|name| name == a))
                 {
                     has_new_element = true;
-                    result.push((k, res));
+                    result.push(*k);
                 }
             }
         }
@@ -99,6 +99,27 @@ fn order_dependences<'a>(
         }
     }
     return result;
+}
+
+fn order_dependences<'a>(
+    resources: &'a HashMap<String, Resource>,
+) -> Vec<(&'a String, &'a Resource)> {
+    let keys = resources.keys().collect::<Vec<_>>();
+    let ordered_keys = order_dependencies_gen(keys.clone(), |k| {
+        resources[k]
+            .get_dependances()
+            .into_iter()
+            .collect::<Vec<_>>()
+    });
+    ordered_keys
+        .into_iter()
+        .map(|k| {
+            (
+                k,
+                resources.get(k).expect("All keys should be in resources"),
+            )
+        })
+        .collect()
 }
 
 #[derive(Serialize, Deserialize, Debug)]

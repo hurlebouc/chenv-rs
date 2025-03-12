@@ -84,7 +84,7 @@ fn order_dependencies_gen<'a>(
     while values.iter().any(|k| result.iter().all(|name| name != k)) {
         let mut has_new_element = false;
         for k in values.iter() {
-            if result.iter().all(|(name)| name != k) {
+            if result.iter().all(|name| name != k) {
                 if ancestors[k]
                     .iter()
                     .all(|a| result.iter().any(|name| name == a))
@@ -145,4 +145,41 @@ pub fn read_config(path: &Option<PathBuf>) -> Conf {
     let conf = settings.try_deserialize::<Conf>().unwrap();
 
     conf
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_order_dependencies_gen() {
+        use std::collections::HashMap;
+
+        use super::order_dependencies_gen;
+
+        let a = "a".to_string();
+        let b = "b".to_string();
+        let c = "c".to_string();
+        let d = "d".to_string();
+        let e = "e".to_string();
+
+        let values = vec![&a, &b, &c, &d, &e];
+        let deps = vec![
+            (&e, vec![&b, &c]),
+            (&b, vec![&d]),
+            (&c, vec![&d]),
+            (&d, vec![&a]),
+            (&a, vec![]),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let result = order_dependencies_gen(values, |k| {
+            deps.get(k)
+                .expect("All keys should be in deps")
+                .iter()
+                .map(|v| *v)
+                .collect()
+        });
+
+        assert_eq!(result, vec!["e", "d", "b", "c", "a"]);
+    }
 }

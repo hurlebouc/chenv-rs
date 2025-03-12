@@ -13,6 +13,7 @@ impl InterpolableString {
     }
 
     pub fn get_variables(&self) -> Vec<&str> {
+        // TODO réfléchir à comment factoriser ce code avec la fonction interpolate_str
         let mut result = Vec::new();
         let mut chars = self.0.chars().enumerate();
         while let Some((_, c)) = chars.next() {

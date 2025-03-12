@@ -12,10 +12,7 @@ pub enum Resource {
         url: InterpolableString,
         sha256: String,
     },
-    File {
-        url: InterpolableString,
-        sha256: String,
-    },
+    File(file::File),
     Git {
         url: InterpolableString,
         commit: String,
@@ -42,8 +39,8 @@ impl Resource {
     pub fn get_dependances(&self) -> Vec<&String> {
         match self {
             Resource::Archive { url, sha256 } => todo!(),
-            Resource::File { url, sha256 } => todo!(),
             Resource::Git { url, commit } => todo!(),
+            Resource::File(file) => todo!(),
         }
     }
 }

@@ -21,7 +21,7 @@ fn main() -> Result<()> {
     let conf = config::read_config(&args.conf_path);
     let mut cmd = Command::new(get_shell());
     if let Some(shell) = &conf.shell {
-        for (k, v) in shell.get_env(&shell.ensure_resources()?) {
+        for (k, v) in shell.get_env(&shell.ensure_resources()?)? {
             cmd.env(k, v);
         }
     }

@@ -16,14 +16,14 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn get_env<'a>(&'a self, env: &Env) -> HashMap<&'a String, String> {
+    pub fn get_env<'a>(&'a self, env: &Env) -> Result<HashMap<&'a String, String>> {
         let mut result = HashMap::new();
         if let Some(e) = &self.env {
             for (k, v) in e {
-                result.insert(k, env.interpolate(v));
+                result.insert(k, env.interpolate(v)?);
             }
         }
-        result
+        Ok(result)
     }
 
     pub fn ensure_resources(&self) -> Result<Env> {
@@ -227,6 +227,77 @@ mod tests {
             result == vec!["a", "b", "c", "d", "e", "f"]
                 || result == vec!["a", "c", "b", "d", "e", "f"]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_order_dependencies_2_roots() -> Result<()> {
+        use std::collections::HashMap;
+
+        use super::order_dependencies_gen;
+
+        let a = "a".to_string();
+        let b = "b".to_string();
+        let c = "c".to_string();
+        let d = "d".to_string();
+        let e = "e".to_string();
+
+        let values = vec![&e, &c, &d, &b, &a];
+        let deps = vec![
+            (&e, vec![]),
+            (&b, vec![&d]),
+            (&a, vec![&c]),
+            (&d, vec![&c]),
+            (&c, vec![&e]),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let result = order_dependencies_gen(values, |k| {
+            deps.get(k)
+                .expect("All keys should be in deps")
+                .iter()
+                .map(|v| *v)
+                .collect()
+        })?;
+
+        assert!(result == vec!["a", "b", "d", "c", "e"] || result == vec!["b", "a", "d", "c", "e"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_order_dependencies_cycle() -> Result<()> {
+        use std::collections::HashMap;
+
+        use super::order_dependencies_gen;
+
+        let a = "a".to_string();
+        let b = "b".to_string();
+        let c = "c".to_string();
+        let d = "d".to_string();
+        let e = "e".to_string();
+
+        let values = vec![&e, &c, &d, &b, &a];
+        let deps = vec![
+            (&e, vec![&d]),
+            (&b, vec![&d]),
+            (&a, vec![&c]),
+            (&d, vec![&c]),
+            (&c, vec![&e]),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let result = order_dependencies_gen(values, |k| {
+            deps.get(k)
+                .expect("All keys should be in deps")
+                .iter()
+                .map(|v| *v)
+                .collect()
+        });
+
+        assert!(result.is_err());
+
         Ok(())
     }
 }

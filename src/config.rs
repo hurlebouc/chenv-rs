@@ -156,7 +156,7 @@ mod tests {
     use anyhow::Result;
 
     #[test]
-    fn test_order_dependencies_gen() -> Result<()> {
+    fn test_order_dependencies_same_length_path() -> Result<()> {
         use std::collections::HashMap;
 
         use super::order_dependencies_gen;
@@ -187,6 +187,46 @@ mod tests {
         })?;
 
         assert!(result == vec!["e", "b", "c", "d", "a"] || result == vec!["e", "c", "b", "d", "a"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_order_dependencies_diff_length_path() -> Result<()> {
+        use std::collections::HashMap;
+
+        use super::order_dependencies_gen;
+
+        let a = "a".to_string();
+        let b = "b".to_string();
+        let c = "c".to_string();
+        let d = "d".to_string();
+        let e = "e".to_string();
+        let f = "f".to_string();
+
+        let values = vec![&f, &e, &d, &c, &b, &a];
+        let deps = vec![
+            (&e, vec![&f]),
+            (&b, vec![&e]),
+            (&f, vec![]),
+            (&a, vec![&b, &c]),
+            (&d, vec![&e]),
+            (&c, vec![&d]),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let result = order_dependencies_gen(values, |k| {
+            deps.get(k)
+                .expect("All keys should be in deps")
+                .iter()
+                .map(|v| *v)
+                .collect()
+        })?;
+
+        assert!(
+            result == vec!["a", "b", "c", "d", "e", "f"]
+                || result == vec!["a", "c", "b", "d", "e", "f"]
+        );
         Ok(())
     }
 }

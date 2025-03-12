@@ -1,13 +1,25 @@
-use std::collections::HashMap;
+mod file;
+
+use std::{collections::HashMap, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
-use url::Url;
+
+use crate::interpol::InterpolableString;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Resource {
-    Archive { url: Url, sha256: String },
-    File { url: Url, sha256: String },
-    Git { url: Url, commit: String },
+    Archive {
+        url: InterpolableString,
+        sha256: String,
+    },
+    File {
+        url: InterpolableString,
+        sha256: String,
+    },
+    Git {
+        url: InterpolableString,
+        commit: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -28,6 +40,10 @@ impl Resource {
         todo!()
     }
     pub fn get_dependances(&self) -> Vec<&String> {
-        todo!()
+        match self {
+            Resource::Archive { url, sha256 } => todo!(),
+            Resource::File { url, sha256 } => todo!(),
+            Resource::Git { url, commit } => todo!(),
+        }
     }
 }

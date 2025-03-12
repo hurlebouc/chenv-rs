@@ -7,12 +7,15 @@ use anyhow::{Result, anyhow};
 use config::Config;
 use serde::{Deserialize, Serialize};
 
-use crate::{interpol::Env, resources::Resource};
+use crate::{
+    interpol::{Env, InterpolableString},
+    resources::Resource,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Environment {
     resources: Option<HashMap<String, Resource>>,
-    env: Option<HashMap<String, String>>,
+    env: Option<HashMap<String, InterpolableString>>,
 }
 
 impl Environment {

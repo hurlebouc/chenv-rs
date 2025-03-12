@@ -1,13 +1,42 @@
 use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 
 use crate::resources::Substrate;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InterpolableString(String);
+impl InterpolableString {
+    pub fn interpolate(&self, env: &Env) -> Result<String> {
+        env.interpolate_str(&self.0)
+    }
+
+    pub fn get_variables(&self) -> Vec<&str> {
+        let mut result = Vec::new();
+        let mut chars = self.0.chars().enumerate();
+        while let Some((_, c)) = chars.next() {
+            if c == '$' {
+                if let Some((start, '{')) = chars.next() {
+                    let mut end = 0;
+                    while let Some((e, c)) = chars.next() {
+                        if c == '}' {
+                            end = e;
+                            break;
+                        }
+                    }
+                    result.push(&self.0[start + 1..end]);
+                }
+            }
+        }
+        result
+    }
+}
 
 pub struct Env(pub HashMap<String, Substrate>);
 
 impl Env {
-    pub fn interpolate(&self, s: &str) -> Result<String> {
+    fn interpolate_str(&self, s: &str) -> Result<String> {
         let mut result = String::new();
         let mut chars = s.chars().enumerate();
         while let Some((_, c)) = chars.next() {
@@ -32,6 +61,10 @@ impl Env {
         }
         Ok(result)
     }
+
+    pub fn interpolate(&self, s: &InterpolableString) -> Result<String> {
+        self.interpolate_str(&s.0)
+    }
 }
 
 #[cfg(test)]
@@ -46,9 +79,9 @@ mod tests {
         ]
         .into_iter()
         .collect());
-        assert_eq!(env.interpolate("hello ${FOO}")?, "hello bar");
-        assert_eq!(env.interpolate("hello ${FOO} ${BAZ}")?, "hello bar qux");
-        assert!(env.interpolate("hello ${FOO} ${BAZ} ${QUUX}").is_err());
+        assert_eq!(env.interpolate_str("hello ${FOO}")?, "hello bar");
+        assert_eq!(env.interpolate_str("hello ${FOO} ${BAZ}")?, "hello bar qux");
+        assert!(env.interpolate_str("hello ${FOO} ${BAZ} ${QUUX}").is_err());
         Ok(())
     }
 }

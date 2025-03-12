@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
 };
 
+use anyhow::{Result, anyhow};
 use config::Config;
 use serde::{Deserialize, Serialize};
 
@@ -25,14 +26,14 @@ impl Environment {
         result
     }
 
-    pub fn ensure_resources(&self) -> Env {
+    pub fn ensure_resources(&self) -> Result<Env> {
         let mut resources = HashMap::new();
         if let Some(r) = &self.resources {
-            for (k, v) in order_dependences(r) {
+            for (k, v) in order_dependences(r)? {
                 resources.insert(k.clone(), v.ensure_resources(&resources));
             }
         }
-        Env(resources)
+        Ok(Env(resources))
     }
 }
 
@@ -60,9 +61,12 @@ fn next_gen<'a>(
 fn order_dependencies_gen<'a>(
     values: Vec<&'a String>,
     descendant: impl Fn(&'a String) -> Vec<&'a String>,
-) -> Vec<&'a String> {
-    let mut deps: HashMap<&'a String, HashSet<&'a String>> =
-        HashMap::from_iter(values.iter().map(|k| (*k, HashSet::new())));
+) -> Result<Vec<&'a String>> {
+    let mut deps: HashMap<&'a String, HashSet<&'a String>> = HashMap::from_iter(
+        values
+            .iter()
+            .map(|k| (*k, HashSet::from_iter(descendant(k)))),
+    );
     let mut deps_next = next_gen(&deps, &descendant);
     while deps_next != deps {
         deps = deps_next;
@@ -95,23 +99,23 @@ fn order_dependencies_gen<'a>(
             }
         }
         if !has_new_element {
-            panic!("Circular dependences detected");
+            return Err(anyhow!("Circular dependences detected"));
         }
     }
-    return result;
+    return Ok(result);
 }
 
 fn order_dependences<'a>(
     resources: &'a HashMap<String, Resource>,
-) -> Vec<(&'a String, &'a Resource)> {
+) -> Result<Vec<(&'a String, &'a Resource)>> {
     let keys = resources.keys().collect::<Vec<_>>();
     let ordered_keys = order_dependencies_gen(keys.clone(), |k| {
         resources[k]
             .get_dependances()
             .into_iter()
             .collect::<Vec<_>>()
-    });
-    ordered_keys
+    })?;
+    Ok(ordered_keys
         .into_iter()
         .map(|k| {
             (
@@ -119,7 +123,7 @@ fn order_dependences<'a>(
                 resources.get(k).expect("All keys should be in resources"),
             )
         })
-        .collect()
+        .collect())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -149,8 +153,10 @@ pub fn read_config(path: &Option<PathBuf>) -> Conf {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Result;
+
     #[test]
-    fn test_order_dependencies_gen() {
+    fn test_order_dependencies_gen() -> Result<()> {
         use std::collections::HashMap;
 
         use super::order_dependencies_gen;
@@ -178,8 +184,9 @@ mod tests {
                 .iter()
                 .map(|v| *v)
                 .collect()
-        });
+        })?;
 
-        assert_eq!(result, vec!["e", "d", "b", "c", "a"]);
+        assert!(result == vec!["e", "b", "c", "d", "a"] || result == vec!["e", "c", "b", "d", "a"]);
+        Ok(())
     }
 }

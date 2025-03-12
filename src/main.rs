@@ -1,4 +1,6 @@
 use std::process::Command;
+
+use anyhow::Result;
 mod cli;
 mod config;
 mod interpol;
@@ -14,14 +16,15 @@ fn get_shell() -> String {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = cli::get_cli();
     let conf = config::read_config(&args.conf_path);
     let mut cmd = Command::new(get_shell());
     if let Some(shell) = &conf.shell {
-        for (k, v) in shell.get_env(&shell.ensure_resources()) {
+        for (k, v) in shell.get_env(&shell.ensure_resources()?) {
             cmd.env(k, v);
         }
     }
     cmd.status().expect("shell failed to start");
+    Ok(())
 }

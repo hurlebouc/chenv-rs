@@ -1,10 +1,11 @@
 mod file;
 
-use std::{collections::HashMap, fmt::Debug};
+use std::path::PathBuf;
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::interpol::InterpolableString;
+use crate::interpol::{Env, InterpolableString};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Resource {
@@ -12,7 +13,11 @@ pub enum Resource {
         url: InterpolableString,
         sha256: String,
     },
-    File(file::File),
+    File {
+        repo_location: Option<PathBuf>,
+        #[serde(flatten)]
+        file: file::File,
+    },
     Git {
         url: InterpolableString,
         commit: String,
@@ -33,14 +38,24 @@ impl Substrate {
 }
 
 impl Resource {
-    pub fn ensure_resources(&self, partial_resources: &HashMap<String, Substrate>) -> Substrate {
-        todo!()
+    pub fn ensure_resources(&self, env: &Env) -> Result<Substrate> {
+        match self {
+            Resource::Archive { url, sha256 } => todo!(),
+            Resource::Git { url, commit } => todo!(),
+            Resource::File {
+                repo_location,
+                file,
+            } => file.ensure_resources(env, repo_location.clone().unwrap_or(".".into()).as_path()),
+        }
     }
     pub fn get_dependances(&self) -> Vec<&str> {
         match self {
             Resource::Archive { url, sha256 } => todo!(),
             Resource::Git { url, commit } => todo!(),
-            Resource::File(file) => file.get_dependances(),
+            Resource::File {
+                repo_location: _,
+                file,
+            } => file.get_dependances(),
         }
     }
 }

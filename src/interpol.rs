@@ -66,6 +66,14 @@ impl Env {
     pub fn interpolate(&self, s: &InterpolableString) -> Result<String> {
         self.interpolate_str(&s.0)
     }
+
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn insert(&mut self, key: String, value: Substrate) {
+        self.0.insert(key, value);
+    }
 }
 
 #[cfg(test)]

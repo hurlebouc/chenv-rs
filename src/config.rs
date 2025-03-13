@@ -30,13 +30,13 @@ impl Environment {
     }
 
     pub fn ensure_resources(&self) -> Result<Env> {
-        let mut resources = HashMap::new();
+        let mut resources = Env::new();
         if let Some(r) = &self.resources {
             for (k, v) in order_dependences(r)? {
-                resources.insert(k.to_string(), v.ensure_resources(&resources));
+                resources.insert(k.to_string(), v.ensure_resources(&resources)?);
             }
         }
-        Ok(Env(resources))
+        Ok(resources)
     }
 }
 

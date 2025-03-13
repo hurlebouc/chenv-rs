@@ -22,6 +22,11 @@ impl File {
         let url_str = self.url.interpolate(env)?;
         let url = url_str.parse::<Url>()?;
         if url.scheme() == "file" {
+            let path = url.to_file_path()?;
+            let dest = repo_location.join(path);
+            std::fs::copy(path, dest)?;
+            return Ok(Substrate::new(dest.to_string_lossy().to_string()));
+        } else {
             todo!()
         }
         todo!()

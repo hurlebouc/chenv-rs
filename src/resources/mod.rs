@@ -40,7 +40,7 @@ impl Resource {
         match self {
             Resource::Archive { url, sha256 } => todo!(),
             Resource::Git { url, commit } => todo!(),
-            Resource::File(file) => todo!(),
+            Resource::File(file) => file.get_dependances(),
         }
     }
 }

@@ -75,32 +75,22 @@ fn order_dependencies_gen<'a>(
         deps = deps_next;
         deps_next = next_gen(&deps, &descendant);
     }
-    let ancestors = values
-        .iter()
-        .map(|k| {
-            (
-                *k,
-                deps.iter()
-                    .filter(|(_, v)| v.contains(*k))
-                    .map(|(k, _)| *k)
-                    .collect::<HashSet<_>>(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
     let mut result = Vec::new();
+    // tant qu'il reste des éléments à ajouter
     while values.iter().any(|k| result.iter().all(|name| name != k)) {
         let mut has_new_element = false;
         for k in values.iter() {
+            // si k n'est pas déjà dans result...
             if result.iter().all(|name| name != k) {
-                if ancestors[k]
-                    .iter()
-                    .all(|a| result.iter().any(|name| name == a))
-                {
+                // ...et si tous les dépendances de k sont dans result
+                if deps[k].iter().all(|a| result.iter().any(|name| name == a)) {
                     has_new_element = true;
                     result.push(*k);
                 }
             }
         }
+        // si on n'a pas ajouté d'élément alors qu'il reste des éléments à ajouter,
+        // c'est qu'il y a une dépendance circulaire
         if !has_new_element {
             return Err(anyhow!("Circular dependences detected"));
         }
@@ -184,7 +174,7 @@ mod tests {
                 .collect()
         })?;
 
-        assert!(result == vec!["e", "b", "c", "d", "a"] || result == vec!["e", "c", "b", "d", "a"]);
+        assert!(result == vec!["a", "d", "c", "b", "e"] || result == vec!["a", "d", "b", "c", "e"]);
         Ok(())
     }
 
@@ -222,8 +212,8 @@ mod tests {
         })?;
 
         assert!(
-            result == vec!["a", "b", "c", "d", "e", "f"]
-                || result == vec!["a", "c", "b", "d", "e", "f"]
+            result == vec!["f", "e", "d", "c", "b", "a"]
+                || result == vec!["f", "e", "d", "b", "c", "a"]
         );
         Ok(())
     }
@@ -259,7 +249,7 @@ mod tests {
                 .collect()
         })?;
 
-        assert!(result == vec!["a", "b", "d", "c", "e"] || result == vec!["b", "a", "d", "c", "e"]);
+        assert!(result == vec!["e", "c", "d", "b", "a"] || result == vec!["e", "c", "d", "a", "b"]);
         Ok(())
     }
 

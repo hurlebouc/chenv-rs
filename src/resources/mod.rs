@@ -36,7 +36,7 @@ impl Resource {
     pub fn ensure_resources(&self, partial_resources: &HashMap<String, Substrate>) -> Substrate {
         todo!()
     }
-    pub fn get_dependances(&self) -> Vec<&String> {
+    pub fn get_dependances(&self) -> Vec<&str> {
         match self {
             Resource::Archive { url, sha256 } => todo!(),
             Resource::Git { url, commit } => todo!(),

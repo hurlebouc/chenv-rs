@@ -33,7 +33,7 @@ impl Environment {
         let mut resources = HashMap::new();
         if let Some(r) = &self.resources {
             for (k, v) in order_dependences(r)? {
-                resources.insert(k.clone(), v.ensure_resources(&resources));
+                resources.insert(k.to_string(), v.ensure_resources(&resources));
             }
         }
         Ok(Env(resources))
@@ -41,9 +41,9 @@ impl Environment {
 }
 
 fn next_gen<'a>(
-    deps: &HashMap<&'a String, HashSet<&'a String>>,
-    descendant: impl Fn(&'a String) -> Vec<&'a String>,
-) -> HashMap<&'a String, HashSet<&'a String>> {
+    deps: &HashMap<&'a str, HashSet<&'a str>>,
+    descendant: impl Fn(&'a str) -> Vec<&'a str>,
+) -> HashMap<&'a str, HashSet<&'a str>> {
     deps.iter()
         .map(|(k, v)| {
             (
@@ -62,10 +62,10 @@ fn next_gen<'a>(
 }
 
 fn order_dependencies_gen<'a>(
-    values: Vec<&'a String>,
-    descendant: impl Fn(&'a String) -> Vec<&'a String>,
-) -> Result<Vec<&'a String>> {
-    let mut deps: HashMap<&'a String, HashSet<&'a String>> = HashMap::from_iter(
+    values: Vec<&'a str>,
+    descendant: impl Fn(&'a str) -> Vec<&'a str>,
+) -> Result<Vec<&'a str>> {
+    let mut deps: HashMap<&'a str, HashSet<&'a str>> = HashMap::from_iter(
         values
             .iter()
             .map(|k| (*k, HashSet::from_iter(descendant(k)))),
@@ -110,14 +110,9 @@ fn order_dependencies_gen<'a>(
 
 fn order_dependences<'a>(
     resources: &'a HashMap<String, Resource>,
-) -> Result<Vec<(&'a String, &'a Resource)>> {
-    let keys = resources.keys().collect::<Vec<_>>();
-    let ordered_keys = order_dependencies_gen(keys.clone(), |k| {
-        resources[k]
-            .get_dependances()
-            .into_iter()
-            .collect::<Vec<_>>()
-    })?;
+) -> Result<Vec<(&'a str, &'a Resource)>> {
+    let keys = resources.keys().map(|k| k.as_str()).collect::<Vec<_>>();
+    let ordered_keys = order_dependencies_gen(keys.clone(), |k| resources[k].get_dependances())?;
     Ok(ordered_keys
         .into_iter()
         .map(|k| {
@@ -164,19 +159,19 @@ mod tests {
 
         use super::order_dependencies_gen;
 
-        let a = "a".to_string();
-        let b = "b".to_string();
-        let c = "c".to_string();
-        let d = "d".to_string();
-        let e = "e".to_string();
+        let a = "a";
+        let b = "b";
+        let c = "c";
+        let d = "d";
+        let e = "e";
 
-        let values = vec![&a, &b, &c, &d, &e];
+        let values = vec![a, b, c, d, e];
         let deps = vec![
-            (&e, vec![&b, &c]),
-            (&b, vec![&d]),
-            (&c, vec![&d]),
-            (&d, vec![&a]),
-            (&a, vec![]),
+            (e, vec![b, c]),
+            (b, vec![d]),
+            (c, vec![d]),
+            (d, vec![a]),
+            (a, vec![]),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
@@ -199,21 +194,21 @@ mod tests {
 
         use super::order_dependencies_gen;
 
-        let a = "a".to_string();
-        let b = "b".to_string();
-        let c = "c".to_string();
-        let d = "d".to_string();
-        let e = "e".to_string();
-        let f = "f".to_string();
+        let a = "a";
+        let b = "b";
+        let c = "c";
+        let d = "d";
+        let e = "e";
+        let f = "f";
 
-        let values = vec![&f, &e, &d, &c, &b, &a];
+        let values = vec![f, e, d, c, b, a];
         let deps = vec![
-            (&e, vec![&f]),
-            (&b, vec![&e]),
-            (&f, vec![]),
-            (&a, vec![&b, &c]),
-            (&d, vec![&e]),
-            (&c, vec![&d]),
+            (e, vec![f]),
+            (b, vec![e]),
+            (f, vec![]),
+            (a, vec![b, c]),
+            (d, vec![e]),
+            (c, vec![d]),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
@@ -239,19 +234,19 @@ mod tests {
 
         use super::order_dependencies_gen;
 
-        let a = "a".to_string();
-        let b = "b".to_string();
-        let c = "c".to_string();
-        let d = "d".to_string();
-        let e = "e".to_string();
+        let a = "a";
+        let b = "b";
+        let c = "c";
+        let d = "d";
+        let e = "e";
 
-        let values = vec![&e, &c, &d, &b, &a];
+        let values = vec![e, c, d, b, a];
         let deps = vec![
-            (&e, vec![]),
-            (&b, vec![&d]),
-            (&a, vec![&c]),
-            (&d, vec![&c]),
-            (&c, vec![&e]),
+            (e, vec![]),
+            (b, vec![d]),
+            (a, vec![c]),
+            (d, vec![c]),
+            (c, vec![e]),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
@@ -274,19 +269,19 @@ mod tests {
 
         use super::order_dependencies_gen;
 
-        let a = "a".to_string();
-        let b = "b".to_string();
-        let c = "c".to_string();
-        let d = "d".to_string();
-        let e = "e".to_string();
+        let a = "a";
+        let b = "b";
+        let c = "c";
+        let d = "d";
+        let e = "e";
 
-        let values = vec![&e, &c, &d, &b, &a];
+        let values = vec![e, c, d, b, a];
         let deps = vec![
-            (&e, vec![&d]),
-            (&b, vec![&d]),
-            (&a, vec![&c]),
-            (&d, vec![&c]),
-            (&c, vec![&e]),
+            (e, vec![d]),
+            (b, vec![d]),
+            (a, vec![c]),
+            (d, vec![c]),
+            (c, vec![e]),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();

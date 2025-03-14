@@ -2,7 +2,8 @@ mod file;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow, bail};
+use jsonpath_rust::JsonPath;
 use serde::{Deserialize, Serialize};
 
 use crate::interpol::{Env, InterpolableString};
@@ -37,6 +38,24 @@ impl Substrate {
 
     pub fn new<T: Serialize>(t: T) -> Self {
         Self(serde_json::to_value(t).unwrap())
+    }
+
+    pub fn resolve(&self, jp: &str) -> Result<String> {
+        let path = JsonPath::try_from(jp)?;
+        let results = path.find_slice(&self.0);
+        if results.is_empty() {
+            return Err(anyhow!("no results found"));
+        }
+        if results.len() > 1 {
+            return Err(anyhow!("multiple results found"));
+        }
+        Ok(match results.into_iter().next().unwrap() {
+            jsonpath_rust::JsonPathValue::Slice(v, _) => Substrate(v.clone()).to_string(),
+            jsonpath_rust::JsonPathValue::NewValue(v) => Substrate(v).to_string(),
+            jsonpath_rust::JsonPathValue::NoValue => {
+                bail!("no value found fot JSON path {} in value {}", jp, self.0)
+            }
+        })
     }
 }
 

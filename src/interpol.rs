@@ -26,7 +26,15 @@ impl InterpolableString {
                             break;
                         }
                     }
-                    result.push(&self.0[start + 1..end]);
+                    let expr = &self.0[start + 1..end];
+                    match expr.split_once('.') {
+                        Some((var, _)) => {
+                            result.push(var);
+                        }
+                        None => {
+                            result.push(expr);
+                        }
+                    }
                 }
             }
         }
@@ -50,11 +58,21 @@ impl Env {
                             break;
                         }
                     }
-                    let key = &s[start + 1..end];
-                    match self.0.get(key) {
-                        Some(val) => result.push_str(&val.to_string()),
-                        None => return Err(anyhow!("missing key: {}", key)),
-                    }
+                    let expr = &s[start + 1..end];
+                    let (key, jp) = expr
+                        .split_once('.')
+                        .map(|(key, jp)| (key, Some(format!("$.{}", jp))))
+                        .unwrap_or((expr, None));
+
+                    let val = match self.0.get(key) {
+                        Some(val) => match jp {
+                            Some(jp) => val.resolve(&jp)?,
+                            None => val.to_string(),
+                        },
+                        None => return Err(anyhow!("missing key: {}", expr)),
+                    };
+
+                    result.push_str(&val);
                 }
             } else {
                 result.push(c);

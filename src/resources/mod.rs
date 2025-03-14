@@ -45,7 +45,10 @@ impl Resource {
             Resource::File {
                 repo_location,
                 file,
-            } => file.ensure_resources(env, repo_location.clone().unwrap_or(".".into()).as_path()),
+            } => file.ensure_resources(
+                env,
+                repo_location.clone().unwrap_or("./.chenv".into()).as_path(),
+            ),
         }
     }
     pub fn get_dependances(&self) -> Vec<&str> {

@@ -19,7 +19,7 @@ pub struct File {
     url: InterpolableString,
     name: String,
     sha256: String,
-    http_proxy: Option<String>,
+    proxy: Option<String>,
 }
 
 impl File {
@@ -73,7 +73,7 @@ impl File {
         if url.scheme() == "http" || url.scheme() == "https" {
             let tmpdir = tempdir()?;
             let file_path = tmpdir.path().join(&self.name);
-            let client = match &self.http_proxy {
+            let client = match &self.proxy {
                 Some(proxy) => reqwest::blocking::Client::builder()
                     .proxy(reqwest::Proxy::all(proxy)?)
                     .build()?,

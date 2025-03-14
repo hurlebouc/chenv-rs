@@ -186,6 +186,7 @@ dependencies = [
  "config",
  "reqwest",
  "serde",
+ "serde_json",
  "sha256",
  "tempfile",
  "url",

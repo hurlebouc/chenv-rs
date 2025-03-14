@@ -73,7 +73,6 @@ impl File {
         if url.scheme() == "http" || url.scheme() == "https" {
             let tmpdir = tempdir()?;
             let file_path = tmpdir.path().join(&self.name);
-            //println!("{:?}", file_path);
             let body = reqwest::blocking::get(url.clone())?;
             let mut body_reader = BufReader::new(body);
 
@@ -87,17 +86,5 @@ impl File {
     }
     pub fn get_dependances(&self) -> Vec<&str> {
         self.url.get_variables()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test() -> Result<()> {
-        let issue_list_url = Url::parse("/a/b/c")?;
-        print!("{}", issue_list_url.scheme());
-        Ok(())
     }
 }

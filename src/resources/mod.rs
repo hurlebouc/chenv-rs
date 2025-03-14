@@ -25,15 +25,18 @@ pub enum Resource {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct Substrate(String);
+pub struct Substrate(serde_json::Value);
 
 impl Substrate {
     pub fn to_string(&self) -> String {
-        self.0.clone()
+        match &self.0 {
+            serde_json::Value::String(a) => a.clone(),
+            _ => self.0.to_string(),
+        }
     }
 
-    pub fn new(s: String) -> Self {
-        Self(s)
+    pub fn new<T: Serialize>(t: T) -> Self {
+        Self(serde_json::to_value(t).unwrap())
     }
 }
 

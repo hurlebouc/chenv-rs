@@ -9,8 +9,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     interpol::{Env, InterpolableString},
-    resources::Resource,
+    resources::{Resource, Substrate},
 };
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Host {
+    env: HashMap<String, String>,
+}
+
+impl Host {
+    fn new() -> Self {
+        Self {
+            env: std::env::vars_os()
+                .map(|(k, v)| {
+                    (
+                        k.to_string_lossy().to_string(),
+                        v.to_string_lossy().to_string(),
+                    )
+                })
+                .collect(),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Environment {
@@ -31,6 +51,7 @@ impl Environment {
 
     pub fn ensure_resources(&self) -> Result<Env> {
         let mut resources = Env::new();
+        resources.insert("host".to_string(), Substrate::new(Host::new()));
         if let Some(r) = &self.resources {
             for (k, v) in order_dependences(r)? {
                 resources.insert(k.to_string(), v.ensure_resources(&resources)?);

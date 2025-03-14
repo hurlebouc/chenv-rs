@@ -1,14 +1,13 @@
 use std::{
-    collections::HashMap,
     fs,
-    io::{self, BufReader, Read, Write},
-    path::{Path, PathBuf},
+    io::{self, BufReader, Write},
+    path::Path,
 };
 
 use anyhow::{Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use sha256::try_digest;
-use tempfile::{tempdir, tempfile};
+use tempfile::tempdir;
 use url::Url;
 
 use crate::interpol::{Env, InterpolableString};
@@ -20,6 +19,7 @@ pub struct File {
     url: InterpolableString,
     name: String,
     sha256: String,
+    http_proxy: Option<String>,
 }
 
 impl File {
@@ -73,9 +73,14 @@ impl File {
         if url.scheme() == "http" || url.scheme() == "https" {
             let tmpdir = tempdir()?;
             let file_path = tmpdir.path().join(&self.name);
-            let body = reqwest::blocking::get(url.clone())?;
+            let client = match &self.http_proxy {
+                Some(proxy) => reqwest::blocking::Client::builder()
+                    .proxy(reqwest::Proxy::all(proxy)?)
+                    .build()?,
+                None => reqwest::blocking::Client::new(),
+            };
+            let body = client.get(url.clone()).send()?;
             let mut body_reader = BufReader::new(body);
-
             let mut file = std::fs::File::create_new(&file_path)?;
             io::copy(&mut body_reader, &mut file)?;
             file.flush()?;

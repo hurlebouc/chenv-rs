@@ -5,6 +5,14 @@ shell:
         url: https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl
         name: kubectl
         sha256: bb16739fcad964c197752200ff89d89aad7b118cb1de5725dc53fe924c40e3f7
+    k9s:
+      File:
+        url: https://github.com/derailed/k9s/releases/download/v0.40.8/k9s_Linux_amd64.tar.gz
+        #url: https://github.com/derailed/k9s/releases/download/v0.40.8/k9s_Windows_amd64.zip
+        name: k9s
+        sha256: 2f69f26eb1c65727e177daca30747a5832b7f39c68280a557d684ef9a25f5b34
+        #sha256: d2bfdc39328fb7fc9a1568292cba8d5b63ba154c304f8b53aece16bf35517abf
+        archive: true
   env:
     PLOP: coucou
     PLIP: "${kubectl}/kubectl:${host.env.PATH}"

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha256::try_digest;
 use tempfile::tempdir;
 use url::Url;
+use zip::ZipArchive;
 
 use crate::interpol::{Env, InterpolableString};
 
@@ -20,6 +21,12 @@ pub struct File {
     name: String,
     sha256: String,
     proxy: Option<String>,
+    #[serde(default = "default_archive")]
+    archive: bool,
+}
+
+fn default_archive() -> bool {
+    false
 }
 
 impl File {
@@ -44,11 +51,19 @@ impl File {
                 self.sha256
             )
         }
-        fs::create_dir_all(output_dir)?;
-        if copy {
-            std::fs::copy(path, dest)?;
+        fs::create_dir_all(&output_dir)?;
+        if self.archive {
+            let file_reader = BufReader::new(std::fs::File::open(path)?);
+            if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
+                std::fs::remove_dir_all(&dest)?;
+                bail!("Error extracting archive: {}", e);
+            }
         } else {
-            std::fs::rename(path, dest)?;
+            if copy {
+                std::fs::copy(path, dest)?;
+            } else {
+                std::fs::rename(path, dest)?;
+            }
         }
         return Ok(());
     }
@@ -87,7 +102,7 @@ impl File {
             self.import_file(&file_path, repo_location, url_str, false)?;
             return Ok(substrate);
         }
-        todo!()
+        bail!("Unsupported scheme {}", url.scheme());
     }
     pub fn get_dependances(&self) -> Vec<&str> {
         self.url.get_variables()

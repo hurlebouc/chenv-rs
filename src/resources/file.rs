@@ -5,6 +5,8 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
+use file_format::FileFormat;
+use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use sha256::try_digest;
 use tempfile::tempdir;
@@ -53,10 +55,28 @@ impl File {
         }
         fs::create_dir_all(&output_dir)?;
         if self.archive {
+            let format = FileFormat::from_file(path)?;
             let file_reader = BufReader::new(std::fs::File::open(path)?);
-            if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
-                std::fs::remove_dir_all(&dest)?;
-                bail!("Error extracting archive: {}", e);
+            match format {
+                FileFormat::Zip => {
+                    if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
+                        std::fs::remove_dir_all(&dest)?;
+                        bail!("Error extracting archive: {}", e);
+                    }
+                }
+                FileFormat::TapeArchive => {
+                    let mut archive = tar::Archive::new(file_reader);
+                    archive.unpack(&dest)?;
+                }
+                FileFormat::Gzip => {
+                    let mut archive = tar::Archive::new(GzDecoder::new(file_reader));
+                    archive.unpack(&dest)?;
+                }
+                _ => bail!(
+                    "Unsupported archive format {} ({})",
+                    format.name(),
+                    format.extension()
+                ),
             }
         } else {
             if copy {

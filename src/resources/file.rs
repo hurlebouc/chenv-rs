@@ -91,7 +91,11 @@ impl File {
     pub fn ensure_resources(&self, env: &Env, repo_location: &Path) -> Result<Substrate> {
         let output_dir = repo_location.join(&self.sha256);
         let output_file = output_dir.join(&self.name);
-        let substrate = Substrate::new(output_dir.to_string_lossy().to_string());
+        let substrate = Substrate::new(
+            std::path::absolute(output_dir)?
+                .to_string_lossy()
+                .to_string(),
+        );
         if output_file.exists() {
             return Ok(substrate);
         }

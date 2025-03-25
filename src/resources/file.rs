@@ -17,6 +17,13 @@ use crate::interpol::{Env, InterpolableString};
 
 use super::Substrate;
 
+#[cfg(target_family = "unix")]
+use nix::sys::statvfs::statvfs;
+#[cfg(target_family = "windows")]
+use std::os::windows::ffi::OsStrExt;
+#[cfg(target_family = "windows")]
+use winapi::um::fileapi::GetVolumePathNameW;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct File {
     url: InterpolableString,
@@ -53,6 +60,62 @@ fn set_executable(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn move_file(src: &Path, dest: &Path) -> Result<()> {
+    let dest_parent = dest
+        .parent()
+        .with_context(|| format!("cannot find parent for {dest:?}"))?;
+    if is_on_same_fs(src, dest_parent)
+        .with_context(|| format!("Cannot determine if {src:?} and {dest:?} are on the same disk"))?
+    {
+        // Same partition, use rename
+        fs::rename(src, dest)?;
+    } else {
+        // Different partitions, use copy and remove
+        fs::copy(src, dest)?;
+        fs::remove_file(src)?;
+    }
+    Ok(())
+}
+
+fn is_on_same_fs(src: &Path, dest: &Path) -> Result<bool> {
+    #[cfg(target_family = "unix")]
+    {
+        // println!(
+        //     "src: {:?}, dest: {:?}",
+        //     statvfs(src)?.filesystem_id(),
+        //     statvfs(dest)?.filesystem_id()
+        // );
+        let src_stat = statvfs(src)?;
+        let dest_stat = statvfs(dest)?;
+        Ok(src_stat.filesystem_id() == dest_stat.filesystem_id())
+    }
+
+    #[cfg(target_family = "windows")]
+    {
+        let src_volume = get_volume_path(src)?;
+        let dest_volume = get_volume_path(dest)?;
+        Ok(src_volume == dest_volume)
+    }
+}
+
+#[cfg(target_family = "windows")]
+fn get_volume_path(path: &Path) -> Result<String> {
+    let mut volume_path = vec![0u16; winapi::shared::minwindef::MAX_PATH];
+    let path_str: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    unsafe {
+        if GetVolumePathNameW(
+            path_str.as_ptr(),
+            volume_path.as_mut_ptr(),
+            volume_path.len() as u32,
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    let volume_path_str = String::from_utf16_lossy(&volume_path);
+    Ok(volume_path_str.trim_end_matches('\u{0}').to_string())
+}
+
 impl File {
     fn import_file(
         &self,
@@ -82,17 +145,23 @@ impl File {
             match format {
                 FileFormat::Zip => {
                     if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
-                        std::fs::remove_dir_all(&dest).with_context(|| format!("Cannot clean after error in extracting {:?}", dest))?;
+                        std::fs::remove_dir_all(&dest).with_context(|| {
+                            format!("Cannot clean after error in extracting {:?}", dest)
+                        })?;
                         bail!("Error extracting archive: {}", e);
                     }
                 }
                 FileFormat::TapeArchive => {
                     let mut archive = tar::Archive::new(file_reader);
-                    archive.unpack(&dest).with_context(|| format!("Cannot unpack tar {:?}", dest))?;
+                    archive
+                        .unpack(&dest)
+                        .with_context(|| format!("Cannot unpack tar {:?}", dest))?;
                 }
                 FileFormat::Gzip => {
                     let mut archive = tar::Archive::new(GzDecoder::new(file_reader));
-                    archive.unpack(&dest).with_context(|| format!("Cannot unpack tar.gz {:?}", dest))?;
+                    archive
+                        .unpack(&dest)
+                        .with_context(|| format!("Cannot unpack tar.gz {:?}", dest))?;
                 }
                 _ => bail!(
                     "Unsupported archive format {} ({})",
@@ -105,8 +174,8 @@ impl File {
                 std::fs::copy(path, &dest)
                     .with_context(|| format!("Cannot copy {:?} into {:?}", path, dest))?;
             } else {
-                std::fs::rename(path, &dest)
-                    .with_context(|| format!("Cannot rename {:?} into {:?}", path, dest))?;
+                move_file(path, &dest)
+                    .with_context(|| format!("Cannot move {:?} into {:?}", path, dest))?;
             }
             if self.executable {
                 set_executable(&dest)

@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use file_format::FileFormat;
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
@@ -82,17 +82,17 @@ impl File {
             match format {
                 FileFormat::Zip => {
                     if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
-                        std::fs::remove_dir_all(&dest)?;
+                        std::fs::remove_dir_all(&dest).with_context(|| format!("Cannot clean after error in extracting {:?}", dest))?;
                         bail!("Error extracting archive: {}", e);
                     }
                 }
                 FileFormat::TapeArchive => {
                     let mut archive = tar::Archive::new(file_reader);
-                    archive.unpack(&dest)?;
+                    archive.unpack(&dest).with_context(|| format!("Cannot unpack tar {:?}", dest))?;
                 }
                 FileFormat::Gzip => {
                     let mut archive = tar::Archive::new(GzDecoder::new(file_reader));
-                    archive.unpack(&dest)?;
+                    archive.unpack(&dest).with_context(|| format!("Cannot unpack tar.gz {:?}", dest))?;
                 }
                 _ => bail!(
                     "Unsupported archive format {} ({})",
@@ -102,12 +102,15 @@ impl File {
             }
         } else {
             if copy {
-                std::fs::copy(path, dest)?;
+                std::fs::copy(path, &dest)
+                    .with_context(|| format!("Cannot copy {:?} into {:?}", path, dest))?;
             } else {
-                std::fs::rename(path, dest)?;
+                std::fs::rename(path, &dest)
+                    .with_context(|| format!("Cannot rename {:?} into {:?}", path, dest))?;
             }
             if self.executable {
-                set_executable(path)?;
+                set_executable(&dest)
+                    .with_context(|| format!("Cannot make {:?} executable", dest))?;
             }
         }
         return Ok(());

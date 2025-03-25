@@ -25,10 +25,32 @@ pub struct File {
     proxy: Option<String>,
     #[serde(default = "default_archive")]
     archive: bool,
+    #[serde(default = "default_executable")]
+    executable: bool,
 }
 
 fn default_archive() -> bool {
     false
+}
+fn default_executable() -> bool {
+    false
+}
+
+#[cfg(target_family = "unix")]
+fn set_executable(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut perm = std::fs::metadata(path)?.permissions();
+    let mut mode = perm.mode();
+    mode = mode + 0o111;
+    perm.set_mode(mode);
+    std::fs::set_permissions(path, perm)?;
+    Ok(())
+}
+
+#[cfg(target_family = "windows")]
+fn set_executable(path: &Path) -> Result<()> {
+    Ok(())
 }
 
 impl File {
@@ -83,6 +105,9 @@ impl File {
                 std::fs::copy(path, dest)?;
             } else {
                 std::fs::rename(path, dest)?;
+            }
+            if self.executable {
+                set_executable(path)?;
             }
         }
         return Ok(());

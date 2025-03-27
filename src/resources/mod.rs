@@ -1,6 +1,6 @@
 mod file;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow, bail};
 use jsonpath_rust::JsonPath;
@@ -60,17 +60,17 @@ impl Substrate {
 }
 
 impl Resource {
-    pub fn ensure_resources(&self, env: &Env) -> Result<Substrate> {
+    pub fn ensure_resources(&self, env: &Env, config_parent: &Path) -> Result<Substrate> {
         match self {
             Resource::Archive { url, sha256 } => todo!(),
             Resource::Git { url, commit } => todo!(),
             Resource::File {
                 repo_location,
                 file,
-            } => file.ensure_resources(
-                env,
-                repo_location.clone().unwrap_or("./.chenv".into()).as_path(),
-            ),
+            } => {
+                let repo_location = repo_location.clone().unwrap_or("./.chenv".into());
+                file.ensure_resources(env, &config_parent.join(&repo_location))
+            }
         }
     }
     pub fn get_dependances(&self) -> Vec<&str> {

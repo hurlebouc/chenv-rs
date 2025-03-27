@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Result, anyhow};
@@ -49,12 +49,15 @@ impl Environment {
         Ok(result)
     }
 
-    pub fn ensure_resources(&self) -> Result<Env> {
+    pub fn ensure_resources(&self, config_parent: &Path) -> Result<Env> {
         let mut resources = Env::new();
         resources.insert("host".to_string(), Substrate::new(Host::new()));
         if let Some(r) = &self.resources {
             for (k, v) in order_dependences(r)? {
-                resources.insert(k.to_string(), v.ensure_resources(&resources)?);
+                resources.insert(
+                    k.to_string(),
+                    v.ensure_resources(&resources, config_parent)?,
+                );
             }
         }
         Ok(resources)
@@ -148,16 +151,18 @@ pub struct Conf {
     pub builder: Option<BuildEnvironment>,
 }
 
-pub fn read_config(path: &Option<PathBuf>) -> Conf {
-    let file = match path {
-        Some(p) => config::File::from(p.as_path()),
-        None => config::File::with_name("chenv"),
-    };
-    let settings = Config::builder().add_source(file).build().unwrap();
+pub fn read_config(path: &Path) -> Result<Conf> {
+    let file = config::File::from(path);
+    let settings = Config::builder().add_source(file).build()?;
+    let conf = settings.try_deserialize::<Conf>()?;
+    Ok(conf)
+}
 
-    let conf = settings.try_deserialize::<Conf>().unwrap();
-
-    conf
+pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
+    let file = config::File::with_name(&path.join("chenv").to_string_lossy().to_string());
+    let settings = Config::builder().add_source(file).build()?;
+    let conf = settings.try_deserialize::<Conf>()?;
+    Ok(conf)
 }
 
 #[cfg(test)]

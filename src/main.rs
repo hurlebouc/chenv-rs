@@ -1,4 +1,8 @@
-use std::process::Command;
+use std::{
+    env::current_dir,
+    path::{Path, PathBuf, absolute},
+    process::Command,
+};
 
 use anyhow::Result;
 mod cli;
@@ -18,13 +22,33 @@ fn get_shell() -> String {
 
 fn main() -> Result<()> {
     let args = cli::get_cli();
-    let conf = config::read_config(&args.conf_path);
-    let mut cmd = Command::new(get_shell());
+    match &args.cmd {
+        cli::Command::Code { path } => {
+            let mut cmd = Command::new("code");
+            cmd.arg("-n").arg("--wait").arg(&path);
+            let conf = config::read_config_in_repo(&path)?;
+            set_command(&mut cmd, &conf, &path)?;
+            cmd.status().expect("shell failed to start");
+        }
+        cli::Command::Init { list } => todo!("Not yet implemented!"),
+        cli::Command::Shell { path } => {
+            let conf = match path {
+                Some(path) => config::read_config(&path)?,
+                None => config::read_config_in_repo(&args.get_repository_path()?)?,
+            };
+            let mut cmd = Command::new(get_shell());
+            set_command(&mut cmd, &conf, &args.get_repository_path()?)?;
+            cmd.status().expect("shell failed to start");
+        }
+    }
+    Ok(())
+}
+
+fn set_command(cmd: &mut Command, conf: &config::Conf, config_parent: &Path) -> Result<()> {
     if let Some(shell) = &conf.shell {
-        for (k, v) in shell.get_env(&shell.ensure_resources()?)? {
+        for (k, v) in shell.get_env(&shell.ensure_resources(config_parent)?)? {
             cmd.env(k, v);
         }
     }
-    cmd.status().expect("shell failed to start");
     Ok(())
 }

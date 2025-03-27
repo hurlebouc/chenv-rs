@@ -109,7 +109,7 @@ fn get_volume_path(path: &Path) -> Result<String> {
             volume_path.len() as u32,
         ) == 0
         {
-            return Err(io::Error::last_os_error());
+            return Err(io::Error::last_os_error())?;
         }
     }
     let volume_path_str = String::from_utf16_lossy(&volume_path);
@@ -140,6 +140,7 @@ impl File {
         }
         fs::create_dir_all(&output_dir)?;
         if self.archive {
+            fs::create_dir(&dest)?;
             let format = FileFormat::from_file(path)?;
             let file_reader = BufReader::new(std::fs::File::open(path)?);
             match format {

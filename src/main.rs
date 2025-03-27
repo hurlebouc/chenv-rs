@@ -20,11 +20,21 @@ fn get_shell() -> String {
     }
 }
 
+fn get_code() -> String {
+    let os = std::env::consts::OS;
+    match os {
+        "linux" => "code".to_string(),
+        "macos" => "code".to_string(),
+        "windows" => "code.cmd".to_string(),
+        _ => "code".to_string(),
+    }
+}
+
 fn main() -> Result<()> {
     let args = cli::get_cli();
     match &args.cmd {
         cli::Command::Code { path } => {
-            let mut cmd = Command::new("code");
+            let mut cmd = Command::new(get_code());
             cmd.arg("-n").arg("--wait").arg(&path);
             let conf = config::read_config_in_repo(&path)?;
             set_command(&mut cmd, &conf, &path)?;

@@ -1,6 +1,6 @@
 [package]
 name = "chenv"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 
 [dependencies]
@@ -10,13 +10,11 @@ anyhow = { version = "1.0.97", features = ["backtrace"] }
 clap = { version = "4.5.32", features = ["derive"] }
 config = "0.15.9"
 file-format = "0.26.0"
-flate2 = "1.1.0"
 jsonpath-rust = "0.7.5"
 reqwest = { version = "0.12.14", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.140"
 sha256 = "1.6.0"
-tar = "0.4.44"
 tempfile = "3.18.0"
 url = { version = "2", features = ["serde"] }
-zip = "2.2.3"
+mkar = { git = "https://codeberg.org/hurlebouc/mkar.git" }

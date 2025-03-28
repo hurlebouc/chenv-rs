@@ -6,12 +6,10 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use file_format::FileFormat;
-use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use sha256::try_digest;
 use tempfile::tempdir;
 use url::Url;
-use zip::ZipArchive;
 
 use crate::interpol::{Env, InterpolableString};
 
@@ -140,36 +138,7 @@ impl File {
         }
         fs::create_dir_all(&output_dir)?;
         if self.archive {
-            fs::create_dir(&dest)?;
-            let format = FileFormat::from_file(path)?;
-            let file_reader = BufReader::new(std::fs::File::open(path)?);
-            match format {
-                FileFormat::Zip => {
-                    if let Err(e) = ZipArchive::new(file_reader)?.extract(&dest) {
-                        std::fs::remove_dir_all(&dest).with_context(|| {
-                            format!("Cannot clean after error in extracting {:?}", dest)
-                        })?;
-                        bail!("Error extracting archive: {}", e);
-                    }
-                }
-                FileFormat::TapeArchive => {
-                    let mut archive = tar::Archive::new(file_reader);
-                    archive
-                        .unpack(&dest)
-                        .with_context(|| format!("Cannot unpack tar {:?}", dest))?;
-                }
-                FileFormat::Gzip => {
-                    let mut archive = tar::Archive::new(GzDecoder::new(file_reader));
-                    archive
-                        .unpack(&dest)
-                        .with_context(|| format!("Cannot unpack tar.gz {:?}", dest))?;
-                }
-                _ => bail!(
-                    "Unsupported archive format {} ({})",
-                    format.name(),
-                    format.extension()
-                ),
-            }
+            mkar::unarchive(path, dest)?;
         } else {
             if copy {
                 std::fs::copy(path, &dest)

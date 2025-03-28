@@ -241,24 +241,22 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chenv"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
  "config",
  "file-format",
- "flate2",
  "jsonpath-rust",
+ "mkar",
  "nix",
  "reqwest",
  "serde",
  "serde_json",
  "sha256",
- "tar",
  "tempfile",
  "url",
  "winapi",
- "zip",
 ]
 
 [[package]]
@@ -1172,6 +1170,21 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "mkar"
+version = "0.1.0"
+source = "git+https://codeberg.org/hurlebouc/mkar.git#b6cfcfd35f2e0d05897e6a846da7e46c9941c9ff"
+dependencies = [
+ "bzip2",
+ "file-format",
+ "flate2",
+ "tar",
+ "tempfile",
+ "thiserror",
+ "xz2",
+ "zip",
 ]
 
 [[package]]

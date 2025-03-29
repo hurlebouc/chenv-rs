@@ -41,21 +41,14 @@ impl Substrate {
     }
 
     pub fn resolve(&self, jp: &str) -> Result<String> {
-        let path = JsonPath::try_from(jp)?;
-        let results = path.find_slice(&self.0);
+        let results = self.0.query(jp)?;
         if results.is_empty() {
             return Err(anyhow!("no results found"));
         }
         if results.len() > 1 {
             return Err(anyhow!("multiple results found"));
         }
-        Ok(match results.into_iter().next().unwrap() {
-            jsonpath_rust::JsonPathValue::Slice(v, _) => Substrate(v.clone()).to_string(),
-            jsonpath_rust::JsonPathValue::NewValue(v) => Substrate(v).to_string(),
-            jsonpath_rust::JsonPathValue::NoValue => {
-                bail!("no value found fot JSON path {} in value {}", jp, self.0)
-            }
-        })
+        Ok(Substrate(results.into_iter().next().unwrap().clone()).to_string())
     }
 }
 

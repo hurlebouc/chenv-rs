@@ -1175,7 +1175,7 @@ dependencies = [
 [[package]]
 name = "mkar"
 version = "0.1.0"
-source = "git+https://codeberg.org/hurlebouc/mkar.git#360e04f664c87c24b9d79180482a0ad3ce780122"
+source = "git+https://codeberg.org/hurlebouc/mkar.git#303c89ccfdc79a4aa7f09f6ece6378912ae98222"
 dependencies = [
  "bzip2",
  "file-format",

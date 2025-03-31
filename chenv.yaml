@@ -14,6 +14,12 @@ shell:
         sha256: 2f69f26eb1c65727e177daca30747a5832b7f39c68280a557d684ef9a25f5b34
         #sha256: d2bfdc39328fb7fc9a1568292cba8d5b63ba154c304f8b53aece16bf35517abf
         archive: true
+    java:
+      File:
+        url: https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u442-b06/OpenJDK8U-jdk_x64_linux_hotspot_8u442b06.tar.gz
+        sha256: 5b0a0145e7790552a9c8767b4680074c4628ec276e5bb278b61d85cf90facafa
+        archive: true
+        name: jdk
   env:
     PLOP: coucou
     PLIP: "${kubectl}/kubectl:${host.env.PATH}"

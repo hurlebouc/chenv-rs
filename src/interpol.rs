@@ -8,6 +8,10 @@ use crate::resources::Substrate;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InterpolableString(String);
 impl InterpolableString {
+    pub fn new(s: String) -> InterpolableString {
+        InterpolableString(s)
+    }
+
     pub fn interpolate(&self, env: &Env) -> Result<String> {
         env.interpolate_str(&self.0)
     }

@@ -1,15 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    str::from_utf8,
 };
 
-use anyhow::{Result, anyhow};
-use config::Config;
+use anyhow::{Context, Result, anyhow, bail};
+use config::{Config, Source};
+use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     interpol::{Env, InterpolableString},
-    resources::{Resource, Substrate},
+    resources::{self, Resource, Substrate},
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,7 +36,9 @@ impl Host {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Environment {
+    #[serde(skip_serializing_if = "Option::is_none")]
     resources: Option<HashMap<String, Resource>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     env: Option<HashMap<String, InterpolableString>>,
 }
 
@@ -147,7 +151,9 @@ pub struct BuildEnvironment {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Conf {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shell: Option<Environment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub builder: Option<BuildEnvironment>,
 }
 
@@ -163,6 +169,92 @@ pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
     let settings = Config::builder().add_source(file).build()?;
     let conf = settings.try_deserialize::<Conf>()?;
     Ok(conf)
+}
+
+impl Conf {
+    pub(crate) fn init_java() -> Result<Conf> {
+        let client = reqwest::blocking::Client::builder()
+            .redirect(redirect::Policy::none())
+            .build()?;
+        let client_with_redirect = reqwest::blocking::Client::builder()
+            .redirect(redirect::Policy::default())
+            .build()?;
+        let version_response = client.get("https://api.adoptium.net/v3/info/release_names?image_type=jdk&jvm_impl=hotspot&release_type=ga&semver=false&version=[8.0,9.0)").send()?.error_for_status()?;
+        let version_json = serde_json::from_str::<serde_json::Value>(&version_response.text()?)?;
+        let release_name = if let serde_json::Value::Object(map) = version_json {
+            if let Some(serde_json::Value::Array(list)) = map.get("releases") {
+                if let Some(serde_json::Value::String(release_name)) = list.get(0) {
+                    release_name.to_owned()
+                } else {
+                    bail!(
+                        "version json must be en object with filed \"releases\" which is a non empty array of strings"
+                    )
+                }
+            } else {
+                bail!("version json must be en object with filed \"releases\" which is an array")
+            }
+        } else {
+            bail!("version json must be an object")
+        };
+        let location_response = client.get(format!("https://api.adoptium.net/v3/binary/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse")).send()?.error_for_status()?;
+        let sha256_response = client_with_redirect
+        .get(format!("https://api.adoptium.net/v3/checksum/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"))
+        .send()?
+        .error_for_status()?;
+        // println!("{sha256_response:?}");
+        let sha256_bytes = sha256_response.bytes()?;
+        let sha256_file = from_utf8(&sha256_bytes)?;
+        // println!("{sha256_file}");
+        let sha256 = sha256_file
+            .split(" ")
+            .next()
+            .context("sha256 response must be of the forme <SHA256> <RELEASE_NAME>")?;
+        let location = match location_response.headers().get("location") {
+            Some(location) => location.to_str()?,
+            None => bail!("Response must redirect to binary"),
+        };
+        return Ok(Conf {
+            shell: Some(Environment {
+                resources: Some(
+                    vec![(
+                        "java".to_string(),
+                        Resource::File {
+                            repo_location: None,
+                            file: resources::file::File {
+                                url: InterpolableString::new(location.to_string()),
+                                name: "jdk".to_string(),
+                                sha256: sha256.to_string(),
+                                proxy: None,
+                                archive: true,
+                                executable: false,
+                            },
+                        },
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+                env: Some(
+                    vec![
+                        (
+                            "PATH".to_string(),
+                            InterpolableString::new(format!(
+                                "${{java}}/jdk/{release_name}/bin:${{host.env.PATH}}"
+                            )),
+                        ),
+                        (
+                            "JAVA_HOME".to_string(),
+                            InterpolableString::new(format!(
+                                "${{java}}/jdk/{release_name}"
+                            )),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            }),
+            builder: None,
+        });
+    }
 }
 
 #[cfg(test)]

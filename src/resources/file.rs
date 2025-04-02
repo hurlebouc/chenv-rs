@@ -24,20 +24,24 @@ use winapi::um::fileapi::GetVolumePathNameW;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct File {
-    url: InterpolableString,
-    name: String,
-    sha256: String,
-    proxy: Option<String>,
-    #[serde(default = "default_archive")]
-    archive: bool,
-    #[serde(default = "default_executable")]
-    executable: bool,
+    pub url: InterpolableString,
+    pub name: String,
+    pub sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<String>,
+    #[serde(default = "default_false")]
+    #[serde(skip_serializing_if = "field_is_false")]
+    pub archive: bool,
+    #[serde(default = "default_false")]
+    #[serde(skip_serializing_if = "field_is_false")]
+    pub executable: bool,
 }
 
-fn default_archive() -> bool {
-    false
+fn field_is_false(v: &bool) -> bool {
+    !v
 }
-fn default_executable() -> bool {
+
+fn default_false() -> bool {
     false
 }
 

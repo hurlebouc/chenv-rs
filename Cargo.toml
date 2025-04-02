@@ -18,3 +18,4 @@ sha256 = "1.6.0"
 tempfile = "3.18.0"
 url = { version = "2", features = ["serde"] }
 mkar = { git = "https://codeberg.org/hurlebouc/mkar.git" }
+serde_yaml = "0.9.34"

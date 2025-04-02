@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use config::Conf;
 mod cli;
 mod config;
 mod interpol;
@@ -40,7 +41,13 @@ fn main() -> Result<()> {
             set_command(&mut cmd, &conf, &path)?;
             cmd.status().expect("shell failed to start");
         }
-        cli::Command::Init { list } => todo!("Not yet implemented!"),
+        cli::Command::Init { lang } => {
+            let conf = Conf::init_java()?;
+            let json = serde_json::to_string_pretty(&conf)?;
+            let yaml = serde_yaml::to_string(&conf)?;
+            println!("{yaml}");
+            println!("{json}");
+        }
         cli::Command::Shell { path } => {
             let conf = match path {
                 Some(path) => config::read_config(&path)?,

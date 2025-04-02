@@ -1,4 +1,4 @@
-mod file;
+pub mod file;
 
 use std::path::{Path, PathBuf};
 
@@ -15,6 +15,7 @@ pub enum Resource {
         sha256: String,
     },
     File {
+        #[serde(skip_serializing_if = "Option::is_none")]
         repo_location: Option<PathBuf>,
         #[serde(flatten)]
         file: file::File,

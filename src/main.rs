@@ -55,9 +55,10 @@ fn main() -> Result<()> {
             set_command(&mut cmd, &conf, &path)?;
             cmd.status().expect("shell failed to start");
         }
-        cli::Command::Init { lang } => {
-            let conf = Conf::init_java(&os)?;
-            let json = serde_json::to_string_pretty(&conf)?;
+        cli::Command::Init {
+            lang: cli::Lang::Java { version },
+        } => {
+            let conf = Conf::init_java(&os, *version)?;
             let yaml = serde_yaml::to_string(&conf)?;
             println!("{yaml}");
         }

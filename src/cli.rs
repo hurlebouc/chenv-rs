@@ -36,7 +36,7 @@ pub enum Command {
 #[derive(Subcommand)]
 pub enum Lang {
     /// init java
-    Java,
+    Java { version: u8 },
 }
 
 pub fn get_cli() -> Cli {

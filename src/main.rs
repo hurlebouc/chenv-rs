@@ -1,7 +1,6 @@
 use std::{
-    env::current_dir,
     io::Write,
-    path::{Path, PathBuf, absolute},
+    path::Path,
     process::Command,
 };
 
@@ -51,9 +50,9 @@ fn main() -> Result<()> {
     match &args.cmd {
         cli::Command::Code { path } => {
             let mut cmd = Command::new(os.get_code());
-            cmd.arg("-n").arg("--wait").arg(&path);
-            let conf = config::read_config_in_repo(&path)?;
-            set_command(&mut cmd, &conf, &path)?;
+            cmd.arg("-n").arg("--wait").arg(path);
+            let conf = config::read_config_in_repo(path)?;
+            set_command(&mut cmd, &conf, path)?;
             cmd.status().expect("shell failed to start");
         }
         cli::Command::Init {
@@ -66,7 +65,7 @@ fn main() -> Result<()> {
         }
         cli::Command::Shell { path } => {
             let conf = match path {
-                Some(path) => config::read_config(&path)?,
+                Some(path) => config::read_config(path)?,
                 None => config::read_config_in_repo(&args.get_repository_path()?)?,
             };
             let mut cmd = Command::new(os.get_shell());

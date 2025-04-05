@@ -2,7 +2,7 @@ pub mod file;
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use jsonpath_rust::JsonPath;
 use serde::{Deserialize, Serialize};
 

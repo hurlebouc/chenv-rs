@@ -5,10 +5,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use file_format::FileFormat;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
-use sha256::try_digest;
 use tempfile::tempdir;
 use url::Url;
 
@@ -55,7 +53,7 @@ fn set_executable(path: &Path) -> Result<()> {
 
     let mut perm = std::fs::metadata(path)?.permissions();
     let mut mode = perm.mode();
-    mode = mode + 0o111;
+    mode += 0o111;
     perm.set_mode(mode);
     std::fs::set_permissions(path, perm)?;
     Ok(())
@@ -193,7 +191,7 @@ impl File {
                     .with_context(|| format!("Cannot make {:?} executable", dest))?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn ensure_resources(&self, env: &Env, repo_location: &Path) -> Result<Substrate> {

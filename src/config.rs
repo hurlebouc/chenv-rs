@@ -78,12 +78,11 @@ fn next_gen<'a>(
             (
                 *k,
                 v.iter()
-                    .map(|dep| {
+                    .flat_map(|dep| {
                         let mut desc = descendant(dep);
                         desc.push(dep);
                         desc
                     })
-                    .flatten()
                     .collect::<HashSet<_>>(),
             )
         })
@@ -160,12 +159,12 @@ pub struct Conf {
 
 pub fn read_config(path: &Path) -> Result<Conf> {
     let file = std::fs::File::open(path)?;
-    return Ok(serde_yaml::from_reader(file)?);
+    Ok(serde_yaml::from_reader(file)?)
 }
 
 pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
-    let file = std::fs::File::open(&path.join("chenv.yaml"))?;
-    return Ok(serde_yaml::from_reader(file)?);
+    let file = std::fs::File::open(path.join("chenv.yaml"))?;
+    Ok(serde_yaml::from_reader(file)?)
 }
 
 impl Conf {
@@ -180,7 +179,7 @@ impl Conf {
         let version_json = serde_json::from_str::<serde_json::Value>(&version_response.text()?)?;
         let release_name = if let serde_json::Value::Object(map) = version_json {
             if let Some(serde_json::Value::Array(list)) = map.get("releases") {
-                if let Some(serde_json::Value::String(release_name)) = list.get(0) {
+                if let Some(serde_json::Value::String(release_name)) = list.first() {
                     release_name.to_owned()
                 } else {
                     bail!(
@@ -261,7 +260,7 @@ impl Conf {
         );
         let mvn_sha512= client_with_redirect.get(format!("https://downloads.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip.sha512")).send()?.error_for_status()?.text()?;
 
-        return Ok(Conf {
+        Ok(Conf {
             shell: Some(Environment {
                 resources: Some(
                     vec![
@@ -329,7 +328,7 @@ impl Conf {
                 ),
             }),
             builder: None,
-        });
+        })
     }
 }
 

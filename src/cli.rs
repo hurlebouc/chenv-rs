@@ -47,8 +47,8 @@ impl Cli {
     pub fn get_repository_path(&self) -> Result<PathBuf> {
         match &self.cmd {
             Command::Init { lang } => todo!(),
-            Command::Code { path } => Ok(absolute(&path)?),
-            Command::Shell { path: Some(path) } => Ok(absolute(&path)?
+            Command::Code { path } => Ok(absolute(path)?),
+            Command::Shell { path: Some(path) } => Ok(absolute(path)?
                 .parent()
                 .with_context(|| format!("Configuration cannot be found as {:?}", path))?
                 .to_owned()),

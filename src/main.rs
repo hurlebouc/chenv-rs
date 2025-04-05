@@ -32,6 +32,7 @@ fn get_code() -> String {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
     let args = cli::get_cli();
     match &args.cmd {
         cli::Command::Code { path } => {
@@ -46,7 +47,6 @@ fn main() -> Result<()> {
             let json = serde_json::to_string_pretty(&conf)?;
             let yaml = serde_yaml::to_string(&conf)?;
             println!("{yaml}");
-            println!("{json}");
         }
         cli::Command::Shell { path } => {
             let conf = match path {

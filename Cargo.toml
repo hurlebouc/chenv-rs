@@ -19,3 +19,7 @@ tempfile = "3.18.0"
 url = { version = "2", features = ["serde"] }
 mkar = { git = "https://codeberg.org/hurlebouc/mkar.git" }
 serde_yaml = "0.9.34"
+
+log = "*"
+env_logger = "0.9"
+sha2 = "0.10.8"

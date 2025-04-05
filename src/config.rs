@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use config::{Config, Source};
+use jsonpath_rust::JsonPath;
 use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 
@@ -205,31 +206,73 @@ impl Conf {
         let sha256_bytes = sha256_response.bytes()?;
         let sha256_file = from_utf8(&sha256_bytes)?;
         // println!("{sha256_file}");
-        let sha256 = sha256_file
+        let java_sha256 = sha256_file
             .split(" ")
             .next()
             .context("sha256 response must be of the forme <SHA256> <RELEASE_NAME>")?;
-        let location = match location_response.headers().get("location") {
+        let java_url = match location_response.headers().get("location") {
             Some(location) => location.to_str()?,
             None => bail!("Response must redirect to binary"),
         };
+
+        let mvn_latest_req = client
+            .get("https://search.maven.org/solrsearch/select?q=g:org.apache.maven+AND+a:maven-core&wt=json")
+            .header(reqwest::header::ACCEPT, "application/json")
+            .header(reqwest::header::USER_AGENT, "lkjlkj");
+        //println!("{mvn_latest_req:?}");
+        let mvn_latest_res = mvn_latest_req.send()?;
+        //println!("{mvn_latest_res:?}");
+        let mvn_latest_str = mvn_latest_res
+            .error_for_status()
+            .context("Failed to get maven-core version")?
+            .text()?;
+        //println!("{mvn_latest_str}");
+        let mvn_latest_json = serde_json::from_str::<serde_json::Value>(&mvn_latest_str)?;
+        let mvn_latest = match mvn_latest_json.query("$.response.docs[0].latestVersion")?[0] {
+            serde_json::Value::String(s) => s,
+            _ => bail!("cannot find latest version"),
+        };
+        // println!("{mvn_latest}");
+        let mvn_url = format!(
+            "https://dlcdn.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip"
+        );
+        let mvn_sha512= client_with_redirect.get(format!("https://downloads.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip.sha512")).send()?.error_for_status()?.text()?;
+
         return Ok(Conf {
             shell: Some(Environment {
                 resources: Some(
-                    vec![(
-                        "java".to_string(),
-                        Resource::File {
-                            repo_location: None,
-                            file: resources::file::File {
-                                url: InterpolableString::new(location.to_string()),
-                                name: "jdk".to_string(),
-                                sha256: sha256.to_string(),
-                                proxy: None,
-                                archive: true,
-                                executable: false,
+                    vec![
+                        (
+                            "java".to_string(),
+                            Resource::File {
+                                repo_location: None,
+                                file: resources::file::File {
+                                    url: InterpolableString::new(java_url.to_string()),
+                                    name: "jdk".to_string(),
+                                    sha256: Some(java_sha256.to_string()),
+                                    sha512: None,
+                                    proxy: None,
+                                    archive: true,
+                                    executable: false,
+                                },
                             },
-                        },
-                    )]
+                        ),
+                        (
+                            "maven".to_string(),
+                            Resource::File {
+                                repo_location: None,
+                                file: resources::file::File {
+                                    url: InterpolableString::new(mvn_url.to_string()),
+                                    name: "mvn".to_string(),
+                                    sha256: None,
+                                    sha512: Some(mvn_sha512.to_string()),
+                                    proxy: None,
+                                    archive: true,
+                                    executable: false,
+                                },
+                            },
+                        ),
+                    ]
                     .into_iter()
                     .collect(),
                 ),
@@ -238,14 +281,12 @@ impl Conf {
                         (
                             "PATH".to_string(),
                             InterpolableString::new(format!(
-                                "${{java}}/jdk/{release_name}/bin:${{host.env.PATH}}"
+                                "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
                             )),
                         ),
                         (
                             "JAVA_HOME".to_string(),
-                            InterpolableString::new(format!(
-                                "${{java}}/jdk/{release_name}"
-                            )),
+                            InterpolableString::new(format!("${{java}}/jdk/{release_name}")),
                         ),
                     ]
                     .into_iter()

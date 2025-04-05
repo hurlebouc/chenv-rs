@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use file_format::FileFormat;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256, Sha512};
 use sha256::try_digest;
 use tempfile::tempdir;
 use url::Url;
@@ -26,7 +27,10 @@ use winapi::um::fileapi::GetVolumePathNameW;
 pub struct File {
     pub url: InterpolableString,
     pub name: String,
-    pub sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy: Option<String>,
     #[serde(default = "default_false")]
@@ -118,6 +122,44 @@ fn get_volume_path(path: &Path) -> Result<String> {
     Ok(volume_path_str.trim_end_matches('\u{0}').to_string())
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Sha<'a> {
+    Sha256(&'a String),
+    Sha512(&'a String),
+}
+
+impl<'a> Sha<'a> {
+    fn compare(&self, path: &Path) -> Result<bool> {
+        match self {
+            Sha::Sha256(s) => {
+                let mut hasher = Sha256::new();
+                let file = std::fs::File::open(path)?;
+                let mut reader = BufReader::new(file);
+                io::copy(&mut reader, &mut hasher)?;
+                let digest = hasher.finalize();
+                let digest = format!("{:x}", digest);
+                Ok(&digest == *s)
+            }
+            Sha::Sha512(s) => {
+                let mut hasher = Sha512::new();
+                let file = std::fs::File::open(path)?;
+                let mut reader = BufReader::new(file);
+                io::copy(&mut reader, &mut hasher)?;
+                let digest = hasher.finalize();
+                let digest = format!("{:x}", digest);
+                Ok(&digest == *s)
+            }
+        }
+    }
+
+    fn small(&self) -> &'a str {
+        match self {
+            Sha::Sha256(s) => &s[..16],
+            Sha::Sha512(s) => &s[..16],
+        }
+    }
+}
+
 impl File {
     fn import_file(
         &self,
@@ -125,20 +167,15 @@ impl File {
         repo_location: &Path,
         orig_url: String,
         copy: bool,
+        sha: &Sha,
     ) -> Result<()> {
-        let output_dir = repo_location.join(&self.sha256);
+        let output_dir = repo_location.join(sha.small());
         if !path.exists() {
             bail!("File {:?} is missing", path)
         }
         let dest = output_dir.join(&self.name);
-        let digest = try_digest(&path)?;
-        if digest != self.sha256 {
-            bail!(
-                "URL {} has sha256 {} while expected is {}",
-                orig_url,
-                digest,
-                self.sha256
-            )
+        if !sha.compare(path)? {
+            bail!("URL {} must have hash equal to {:?}", orig_url, sha)
         }
         fs::create_dir_all(&output_dir)?;
         if self.archive {
@@ -160,7 +197,13 @@ impl File {
     }
 
     pub fn ensure_resources(&self, env: &Env, repo_location: &Path) -> Result<Substrate> {
-        let output_dir = repo_location.join(&self.sha256);
+        let sha = match (&self.sha256, &self.sha512) {
+            (None, None) => bail!("Need sha256 or sha512"),
+            (None, Some(s)) => Sha::Sha512(s),
+            (Some(s), None) => Sha::Sha256(s),
+            (Some(_), Some(_)) => bail!("Cannot have both sha256 and sha512"),
+        };
+        let output_dir = repo_location.join(sha.small());
         let output_file = output_dir.join(&self.name);
         let substrate = Substrate::new(
             std::path::absolute(output_dir)?
@@ -177,7 +220,7 @@ impl File {
             let path = url
                 .to_file_path()
                 .map_err(|()| anyhow!("Url {} is not a file", url))?;
-            self.import_file(&path, repo_location, url_str, true)?;
+            self.import_file(&path, repo_location, url_str, true, &sha)?;
             return Ok(substrate);
         }
         if url.scheme() == "http" || url.scheme() == "https" {
@@ -194,7 +237,7 @@ impl File {
             let mut file = std::fs::File::create_new(&file_path)?;
             io::copy(&mut body_reader, &mut file)?;
             file.flush()?;
-            self.import_file(&file_path, repo_location, url_str, false)?;
+            self.import_file(&file_path, repo_location, url_str, false, &sha)?;
             return Ok(substrate);
         }
         bail!("Unsupported scheme {}", url.scheme());

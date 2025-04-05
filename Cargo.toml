@@ -8,7 +8,6 @@ nix = { version = "0.29.0", features = ["fs"] }
 winapi = { version = "0.3", features = ["fileapi"] }
 anyhow = { version = "1.0.97", features = ["backtrace"] }
 clap = { version = "4.5.32", features = ["derive"] }
-config = "0.15.9"
 file-format = "0.26.0"
 jsonpath-rust = "1.0.0"
 reqwest = { version = "0.12.14", features = ["blocking"] }

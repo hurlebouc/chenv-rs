@@ -1,5 +1,6 @@
 use std::{
     env::current_dir,
+    io::Write,
     path::{Path, PathBuf, absolute},
     process::Command,
 };
@@ -60,7 +61,8 @@ fn main() -> Result<()> {
         } => {
             let conf = Conf::init_java(&os, *version)?;
             let yaml = serde_yaml::to_string(&conf)?;
-            println!("{yaml}");
+            let mut file = std::fs::File::create("chenv.yaml")?;
+            file.write_all(yaml.as_bytes())?;
         }
         cli::Command::Shell { path } => {
             let conf = match path {

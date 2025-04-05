@@ -1,12 +1,10 @@
 use std::{
     collections::{HashMap, HashSet},
-    os,
-    path::{Path, PathBuf},
+    path::Path,
     str::from_utf8,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use config::{Config, Source};
 use jsonpath_rust::JsonPath;
 use reqwest::redirect;
 use serde::{Deserialize, Serialize};
@@ -161,28 +159,24 @@ pub struct Conf {
 }
 
 pub fn read_config(path: &Path) -> Result<Conf> {
-    let file = config::File::from(path);
-    let settings = Config::builder().add_source(file).build()?;
-    let conf = settings.try_deserialize::<Conf>()?;
-    Ok(conf)
+    let file = std::fs::File::open(path)?;
+    return Ok(serde_yaml::from_reader(file)?);
 }
 
 pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
-    let file = config::File::with_name(&path.join("chenv").to_string_lossy().to_string());
-    let settings = Config::builder().add_source(file).build()?;
-    let conf = settings.try_deserialize::<Conf>()?;
-    Ok(conf)
+    let file = std::fs::File::open(&path.join("chenv.yaml"))?;
+    return Ok(serde_yaml::from_reader(file)?);
 }
 
 impl Conf {
-    pub(crate) fn init_java(os: &Os) -> Result<Conf> {
+    pub(crate) fn init_java(os: &Os, version: u8) -> Result<Conf> {
         let client = reqwest::blocking::Client::builder()
             .redirect(redirect::Policy::none())
             .build()?;
         let client_with_redirect = reqwest::blocking::Client::builder()
             .redirect(redirect::Policy::default())
             .build()?;
-        let version_response = client.get("https://api.adoptium.net/v3/info/release_names?image_type=jdk&jvm_impl=hotspot&release_type=ga&semver=false&version=[8.0,9.0)").send()?.error_for_status()?;
+        let version_response = client.get(format!("https://api.adoptium.net/v3/info/release_names?image_type=jdk&jvm_impl=hotspot&release_type=ga&semver=false&version=[{}.0,{}.0)", version, version+1)).send()?.error_for_status()?;
         let version_json = serde_json::from_str::<serde_json::Value>(&version_response.text()?)?;
         let release_name = if let serde_json::Value::Object(map) = version_json {
             if let Some(serde_json::Value::Array(list)) = map.get("releases") {

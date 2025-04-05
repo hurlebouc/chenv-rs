@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    os,
     path::{Path, PathBuf},
     str::from_utf8,
 };
@@ -11,6 +12,7 @@ use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Os,
     interpol::{Env, InterpolableString},
     resources::{self, Resource, Substrate},
 };
@@ -173,7 +175,7 @@ pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
 }
 
 impl Conf {
-    pub(crate) fn init_java() -> Result<Conf> {
+    pub(crate) fn init_java(os: &Os) -> Result<Conf> {
         let client = reqwest::blocking::Client::builder()
             .redirect(redirect::Policy::none())
             .build()?;
@@ -197,11 +199,37 @@ impl Conf {
         } else {
             bail!("version json must be an object")
         };
-        let location_response = client.get(format!("https://api.adoptium.net/v3/binary/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse")).send()?.error_for_status()?;
+        let (java_location_url, java_sha_url) = match os {
+            Os::Linux => (
+                format!(
+                    "https://api.adoptium.net/v3/binary/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"
+                ),
+                format!(
+                    "https://api.adoptium.net/v3/checksum/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"
+                ),
+            ),
+            Os::MacOS => (
+                format!(
+                    "https://api.adoptium.net/v3/binary/version/{release_name}/mac/x64/jdk/hotspot/normal/eclipse"
+                ),
+                format!(
+                    "https://api.adoptium.net/v3/checksum/version/{release_name}/mac/x64/jdk/hotspot/normal/eclipse"
+                ),
+            ),
+            Os::Windows => (
+                format!(
+                    "https://api.adoptium.net/v3/binary/version/{release_name}/windows/x64/jdk/hotspot/normal/eclipse"
+                ),
+                format!(
+                    "https://api.adoptium.net/v3/checksum/version/{release_name}/windows/x64/jdk/hotspot/normal/eclipse"
+                ),
+            ),
+        };
+        let location_response = client.get(java_location_url).send()?.error_for_status()?;
         let sha256_response = client_with_redirect
-        .get(format!("https://api.adoptium.net/v3/checksum/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"))
-        .send()?
-        .error_for_status()?;
+            .get(java_sha_url)
+            .send()?
+            .error_for_status()?;
         // println!("{sha256_response:?}");
         let sha256_bytes = sha256_response.bytes()?;
         let sha256_file = from_utf8(&sha256_bytes)?;
@@ -218,7 +246,7 @@ impl Conf {
         let mvn_latest_req = client
             .get("https://search.maven.org/solrsearch/select?q=g:org.apache.maven+AND+a:maven-core&wt=json")
             .header(reqwest::header::ACCEPT, "application/json")
-            .header(reqwest::header::USER_AGENT, "lkjlkj");
+            .header(reqwest::header::USER_AGENT, "chenv");
         //println!("{mvn_latest_req:?}");
         let mvn_latest_res = mvn_latest_req.send()?;
         //println!("{mvn_latest_res:?}");
@@ -233,6 +261,7 @@ impl Conf {
             _ => bail!("cannot find latest version"),
         };
         // println!("{mvn_latest}");
+
         let mvn_url = format!(
             "https://dlcdn.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip"
         );
@@ -279,10 +308,22 @@ impl Conf {
                 env: Some(
                     vec![
                         (
-                            "PATH".to_string(),
-                            InterpolableString::new(format!(
-                                "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
-                            )),
+                            match os {
+                                Os::Linux => "PATH".to_string(),
+                                Os::Windows => "Path".to_string(),
+                                Os::MacOS => "PATH".to_string(),
+                            },
+                            InterpolableString::new(match os {
+                                Os::Linux => format!(
+                                    "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
+                                ),
+                                Os::MacOS => format!(
+                                    "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
+                                ),
+                                Os::Windows => format!(
+                                    "${{java}}\\jdk\\{release_name}\\bin;${{maven}}\\mvn\\apache-maven-{mvn_latest}\\bin;${{host.env.Path}}"
+                                ),
+                            }),
                         ),
                         (
                             "JAVA_HOME".to_string(),

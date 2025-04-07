@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::interpol::{Env, InterpolableString};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Resource {
     Archive {
         url: InterpolableString,

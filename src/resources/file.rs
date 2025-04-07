@@ -21,7 +21,7 @@ use std::os::windows::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
 use winapi::um::fileapi::GetVolumePathNameW;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct File {
     pub url: InterpolableString,
     pub name: String,

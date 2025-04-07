@@ -36,7 +36,18 @@ pub enum Command {
 #[derive(Subcommand)]
 pub enum Lang {
     /// init java
-    Java { version: u8 },
+    Java {
+        /// Use sbt
+        #[arg(long, default_value_t = false)]
+        sbt: bool,
+
+        /// disable build tool installation
+        #[arg(long, default_value_t = false)]
+        no_build_tool: bool,
+
+        /// Java version
+        version: u8,
+    },
 }
 
 pub fn get_cli() -> Cli {

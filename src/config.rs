@@ -35,12 +35,23 @@ impl Host {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PathEnv(pub Vec<InterpolableString>);
+
+impl PathEnv {
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Environment {
     #[serde(skip_serializing_if = "Option::is_none")]
-    resources: Option<HashMap<String, Resource>>,
+    pub resources: Option<HashMap<String, Resource>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, InterpolableString>>,
+    pub env: Option<HashMap<String, InterpolableString>>,
+    #[serde(skip_serializing_if = "PathEnv::is_empty", default)]
+    pub path: PathEnv,
 }
 
 impl Environment {
@@ -50,6 +61,14 @@ impl Environment {
             for (k, v) in e {
                 result.insert(k, env.interpolate(v)?);
             }
+        }
+        Ok(result)
+    }
+
+    pub fn get_path<'c>(&'c self, env: &Env) -> Result<Vec<String>> {
+        let mut result = Vec::new();
+        for v in &self.path.0 {
+            result.push(env.interpolate(v)?);
         }
         Ok(result)
     }
@@ -67,6 +86,41 @@ impl Environment {
         }
         Ok(resources)
     }
+
+    pub(crate) fn merge(self, other: Environment) -> Result<Self> {
+        let env = match (self.env, other.env) {
+            (None, None) => None,
+            (None, Some(env)) => Some(env),
+            (Some(env), None) => Some(env),
+            (Some(env1), Some(env2)) => Some(merge_maps(env1, env2)?),
+        };
+        let resources = match (self.resources, other.resources) {
+            (None, None) => None,
+            (None, Some(resources)) => Some(resources),
+            (Some(resources), None) => Some(resources),
+            (Some(r1), Some(r2)) => Some(merge_maps(r1, r2)?),
+        };
+        let path = PathEnv(self.path.0.into_iter().chain(other.path.0).collect());
+        Ok(Self {
+            env,
+            resources,
+            path,
+        })
+    }
+}
+
+fn merge_maps<V>(map1: HashMap<String, V>, map2: HashMap<String, V>) -> Result<HashMap<String, V>>
+where
+    V: Eq,
+{
+    let mut merged = map1;
+    for (k, v) in map2.into_iter() {
+        if let Some(false) = merged.get(&k).map(|previous| previous == &v) {
+            bail!("Both maps have same key ({k}) with different values");
+        }
+        merged.insert(k, v);
+    }
+    Ok(merged)
 }
 
 fn next_gen<'a>(
@@ -148,7 +202,6 @@ pub struct BuildEnvironment {
     #[serde(flatten)]
     pub env: Environment,
 }
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Conf {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -165,171 +218,6 @@ pub fn read_config(path: &Path) -> Result<Conf> {
 pub fn read_config_in_repo(path: &Path) -> Result<Conf> {
     let file = std::fs::File::open(path.join("chenv.yaml"))?;
     Ok(serde_yaml::from_reader(file)?)
-}
-
-impl Conf {
-    pub(crate) fn init_java(os: &Os, version: u8) -> Result<Conf> {
-        let client = reqwest::blocking::Client::builder()
-            .redirect(redirect::Policy::none())
-            .build()?;
-        let client_with_redirect = reqwest::blocking::Client::builder()
-            .redirect(redirect::Policy::default())
-            .build()?;
-        let version_response = client.get(format!("https://api.adoptium.net/v3/info/release_names?image_type=jdk&jvm_impl=hotspot&release_type=ga&semver=false&version=[{}.0,{}.0)", version, version+1)).send()?.error_for_status()?;
-        let version_json = serde_json::from_str::<serde_json::Value>(&version_response.text()?)?;
-        let release_name = if let serde_json::Value::Object(map) = version_json {
-            if let Some(serde_json::Value::Array(list)) = map.get("releases") {
-                if let Some(serde_json::Value::String(release_name)) = list.first() {
-                    release_name.to_owned()
-                } else {
-                    bail!(
-                        "version json must be en object with filed \"releases\" which is a non empty array of strings"
-                    )
-                }
-            } else {
-                bail!("version json must be en object with filed \"releases\" which is an array")
-            }
-        } else {
-            bail!("version json must be an object")
-        };
-        let (java_location_url, java_sha_url) = match os {
-            Os::Linux => (
-                format!(
-                    "https://api.adoptium.net/v3/binary/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"
-                ),
-                format!(
-                    "https://api.adoptium.net/v3/checksum/version/{release_name}/linux/x64/jdk/hotspot/normal/eclipse"
-                ),
-            ),
-            Os::MacOS => (
-                format!(
-                    "https://api.adoptium.net/v3/binary/version/{release_name}/mac/x64/jdk/hotspot/normal/eclipse"
-                ),
-                format!(
-                    "https://api.adoptium.net/v3/checksum/version/{release_name}/mac/x64/jdk/hotspot/normal/eclipse"
-                ),
-            ),
-            Os::Windows => (
-                format!(
-                    "https://api.adoptium.net/v3/binary/version/{release_name}/windows/x64/jdk/hotspot/normal/eclipse"
-                ),
-                format!(
-                    "https://api.adoptium.net/v3/checksum/version/{release_name}/windows/x64/jdk/hotspot/normal/eclipse"
-                ),
-            ),
-        };
-        let location_response = client.get(java_location_url).send()?.error_for_status()?;
-        let sha256_response = client_with_redirect
-            .get(java_sha_url)
-            .send()?
-            .error_for_status()?;
-        // println!("{sha256_response:?}");
-        let sha256_bytes = sha256_response.bytes()?;
-        let sha256_file = from_utf8(&sha256_bytes)?;
-        // println!("{sha256_file}");
-        let java_sha256 = sha256_file
-            .split(" ")
-            .next()
-            .context("sha256 response must be of the forme <SHA256> <RELEASE_NAME>")?;
-        let java_url = match location_response.headers().get("location") {
-            Some(location) => location.to_str()?,
-            None => bail!("Response must redirect to binary"),
-        };
-
-        let mvn_latest_req = client
-            .get("https://search.maven.org/solrsearch/select?q=g:org.apache.maven+AND+a:maven-core&wt=json")
-            .header(reqwest::header::ACCEPT, "application/json")
-            .header(reqwest::header::USER_AGENT, "chenv");
-        //println!("{mvn_latest_req:?}");
-        let mvn_latest_res = mvn_latest_req.send()?;
-        //println!("{mvn_latest_res:?}");
-        let mvn_latest_str = mvn_latest_res
-            .error_for_status()
-            .context("Failed to get maven-core version")?
-            .text()?;
-        //println!("{mvn_latest_str}");
-        let mvn_latest_json = serde_json::from_str::<serde_json::Value>(&mvn_latest_str)?;
-        let mvn_latest = match mvn_latest_json.query("$.response.docs[0].latestVersion")?[0] {
-            serde_json::Value::String(s) => s,
-            _ => bail!("cannot find latest version"),
-        };
-        // println!("{mvn_latest}");
-
-        let mvn_url = format!(
-            "https://dlcdn.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip"
-        );
-        let mvn_sha512= client_with_redirect.get(format!("https://downloads.apache.org/maven/maven-4/{mvn_latest}/binaries/apache-maven-{mvn_latest}-bin.zip.sha512")).send()?.error_for_status()?.text()?;
-
-        Ok(Conf {
-            shell: Some(Environment {
-                resources: Some(
-                    vec![
-                        (
-                            "java".to_string(),
-                            Resource::File {
-                                repo_location: None,
-                                file: resources::file::File {
-                                    url: InterpolableString::new(java_url.to_string()),
-                                    name: "jdk".to_string(),
-                                    sha256: Some(java_sha256.to_string()),
-                                    sha512: None,
-                                    proxy: None,
-                                    archive: true,
-                                    executable: false,
-                                },
-                            },
-                        ),
-                        (
-                            "maven".to_string(),
-                            Resource::File {
-                                repo_location: None,
-                                file: resources::file::File {
-                                    url: InterpolableString::new(mvn_url.to_string()),
-                                    name: "mvn".to_string(),
-                                    sha256: None,
-                                    sha512: Some(mvn_sha512.to_string()),
-                                    proxy: None,
-                                    archive: true,
-                                    executable: false,
-                                },
-                            },
-                        ),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-                env: Some(
-                    vec![
-                        (
-                            match os {
-                                Os::Linux => "PATH".to_string(),
-                                Os::Windows => "Path".to_string(),
-                                Os::MacOS => "PATH".to_string(),
-                            },
-                            InterpolableString::new(match os {
-                                Os::Linux => format!(
-                                    "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
-                                ),
-                                Os::MacOS => format!(
-                                    "${{java}}/jdk/{release_name}/bin:${{maven}}/mvn/apache-maven-{mvn_latest}/bin:${{host.env.PATH}}"
-                                ),
-                                Os::Windows => format!(
-                                    "${{java}}\\jdk\\{release_name}\\bin;${{maven}}\\mvn\\apache-maven-{mvn_latest}\\bin;${{host.env.Path}}"
-                                ),
-                            }),
-                        ),
-                        (
-                            "JAVA_HOME".to_string(),
-                            InterpolableString::new(format!("${{java}}/jdk/{release_name}")),
-                        ),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-            }),
-            builder: None,
-        })
-    }
 }
 
 #[cfg(test)]

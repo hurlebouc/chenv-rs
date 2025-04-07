@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::resources::Substrate;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InterpolableString(String);
 impl InterpolableString {
     pub fn new(s: String) -> InterpolableString {

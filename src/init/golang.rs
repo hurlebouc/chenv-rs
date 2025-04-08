@@ -44,8 +44,23 @@ pub(crate) fn go() -> Result<Environment> {
         .get("version")
         .and_then(|v| v.as_str())
         .context("Failed to find the latest stable Go version")?;
+
+    let os_str = match Os::get() {
+        Os::Linux => "linux",
+        Os::MacOS => "darwin",
+        Os::Windows => "windows",
+    };
+
+    let archive_fmt = match Os::get() {
+        Os::Linux => "tar.gz",
+        Os::MacOS => "tar.gz",
+        Os::Windows => "zip",
+    };
+
     let go_latest_sha256_all = go_latest
-        .query("$.files[?@.os == \"linux\" && @.arch == \"amd64\"].sha256")
+        .query(&format!(
+            "$.files[?@.os == \"{os_str}\" && @.arch == \"amd64\"].sha256"
+        ))
         .context("Failed to find the sha256 of the latest stable Go version")?;
     let go_latest_sha256 = go_latest_sha256_all
         .first()
@@ -56,11 +71,7 @@ pub(crate) fn go() -> Result<Environment> {
     let go_latest_trimmed = go_latest_version.trim_start_matches('v'); // Supprimer le préfixe 'v'
 
     // Construire les URLs pour le binaire et le checksum
-    let go_url = match Os::get() {
-        Os::Linux => format!("https://go.dev/dl/{go_latest_trimmed}.linux-amd64.tar.gz"),
-        Os::MacOS => format!("https://go.dev/dl/{go_latest_trimmed}.darwin-amd64.tar.gz"),
-        Os::Windows => format!("https://go.dev/dl/{go_latest_trimmed}.windows-amd64.zip"),
-    };
+    let go_url = format!("https://go.dev/dl/{go_latest_trimmed}.{os_str}-amd64.{archive_fmt}");
 
     Ok(Environment {
         resources: Some(

@@ -48,6 +48,8 @@ pub enum Lang {
         /// Java version
         version: u8,
     },
+
+    Go,
 }
 
 pub fn get_cli() -> Cli {

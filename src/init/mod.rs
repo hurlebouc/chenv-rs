@@ -1,16 +1,8 @@
-use std::str::from_utf8;
+use anyhow::{Ok, Result};
 
-use anyhow::{Context, Ok, Result, bail};
-use jsonpath_rust::JsonPath;
-use reqwest::redirect;
+use crate::config::Conf;
 
-use crate::{
-    Os,
-    config::{Conf, Environment, PathEnv},
-    interpol::InterpolableString,
-    resources::{self, Resource},
-};
-
+mod golang;
 mod java;
 
 #[derive(Debug, Clone, Copy)]
@@ -37,5 +29,13 @@ impl Conf {
                 builder: None,
             })
         }
+    }
+
+    pub(crate) fn init_go() -> Result<Conf> {
+        let go = golang::go()?;
+        Ok(Conf {
+            shell: Some(go),
+            builder: None,
+        })
     }
 }

@@ -86,6 +86,14 @@ fn main() -> Result<()> {
             let mut file = std::fs::File::create("chenv.yaml")?;
             file.write_all(yaml.as_bytes())?;
         }
+        cli::Command::Init {
+            lang: cli::Lang::Go,
+        } => {
+            let conf = Conf::init_go()?;
+            let yaml = serde_yaml::to_string(&conf)?;
+            let mut file = std::fs::File::create("chenv.yaml")?;
+            file.write_all(yaml.as_bytes())?;
+        }
         cli::Command::Shell { path } => {
             let conf = match path {
                 Some(path) => config::read_config(path)?,

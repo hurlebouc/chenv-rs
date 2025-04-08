@@ -49,7 +49,11 @@ pub enum Lang {
         version: u8,
     },
 
+    /// init Go
     Go,
+
+    /// init Javascript
+    Node,
 }
 
 pub fn get_cli() -> Cli {

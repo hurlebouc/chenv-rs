@@ -4,6 +4,7 @@ use crate::config::Conf;
 
 mod golang;
 mod java;
+mod node;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum JavaBuildTool {
@@ -35,6 +36,14 @@ impl Conf {
         let go = golang::go()?;
         Ok(Conf {
             shell: Some(go),
+            builder: None,
+        })
+    }
+
+    pub(crate) fn init_node() -> Result<Conf> {
+        let node = node::node()?;
+        Ok(Conf {
+            shell: Some(node),
             builder: None,
         })
     }

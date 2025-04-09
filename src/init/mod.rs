@@ -5,6 +5,7 @@ use crate::config::Conf;
 mod golang;
 mod java;
 mod node;
+mod python;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum JavaBuildTool {
@@ -44,6 +45,14 @@ impl Conf {
         let node = node::node()?;
         Ok(Conf {
             shell: Some(node),
+            builder: None,
+        })
+    }
+
+    pub(crate) fn init_python() -> Result<Conf> {
+        let python = python::python()?;
+        Ok(Conf {
+            shell: Some(python),
             builder: None,
         })
     }

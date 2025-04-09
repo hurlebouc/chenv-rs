@@ -54,6 +54,10 @@ pub enum Lang {
 
     /// init Javascript
     Node,
+
+    /// init Python (WIP)
+    #[command(hide = true)]
+    Python,
 }
 
 pub fn get_cli() -> Cli {
